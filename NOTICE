@@ -1,0 +1,12 @@
+protoc-gen-dynamo
+Copyright (c) 2020, Paul Querna
+
+This product includes software developed by
+Paul Querna (http://paul.querna.org/).
+
+====================================
+
+Portions of the original implementation were derived from protoc-gen-policy:
+    https://github.com/chef/automate/tree/master/components/automate-grpc/protoc-gen-policy
+protoc-gen-policy: is part of Chef Automate:
+    https://github.com/chef/automate/blob/master/LICENSE

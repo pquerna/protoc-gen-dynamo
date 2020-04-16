@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package dynamo;
+
+option go_package = "github.com/pquerna/protoc-gen-dynamo/dynamo";
+
+import "google/protobuf/descriptor.proto";
+
+// TODO(pquerna): register here https://github.com/protocolbuffers/protobuf/blob/master/docs/options.md
+extend google.protobuf.MessageOptions {
+  DynamoMessageOptions msg = 6000;
+}
+
+message DynamoMessageOptions {
+  // Disables generation for this message
+  bool disabled = 1;
+  // A compound value that can be used as a Partition Key.
+  Key partition = 2;
+  // A compound value that can be used as a Sort Key.
+  Key sort = 3;
+  // A list of compound values that can be set from other fields.
+  repeated Key compound_field = 4;
+}
+
+message Key {
+  string name = 1;
+  repeated string fields = 2;
+  string prefix = 3;
+  // defaults to `:` if unset, only used if more than one field is set
+  string separator = 4;
+}
+
+extend google.protobuf.FieldOptions {
+  DynamoFieldOptions field = 6000;
+}
+
+message DynamoFieldOptions {
+  bool skip = 1;
+  string name = 2;
+  Types type = 3;
+}
+
+message Types {
+  bool binary = 100;
+  bool set = 200;
+  bool unix_second = 300;
+  bool unix_milli = 301;
+  bool unix_nano = 302;
+}
