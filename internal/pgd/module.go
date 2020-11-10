@@ -436,6 +436,7 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 		stmts := []jen.Code{}
 		needErr := false
 		loop := []jen.Code{}
+		needValue := false
 		for _, field := range msg.Fields() {
 			fext := dynamopb.DynamoFieldOptions{}
 			ok, err := field.Extension(dynamopb.E_Field, &fext)
@@ -500,8 +501,12 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 			}, stmts...)
 		}
 
+		valueId := "value"
+		if !needValue {
+			valueId = "_"
+		}
 		stmts = append(stmts,
-			jen.For(jen.List(jen.Id("key"), jen.Id("value")).Op(":=").Range().Id("av").Dot("M")).Block(
+			jen.For(jen.List(jen.Id("key"), jen.Id(valueId)).Op(":=").Range().Id("av").Dot("M")).Block(
 				jen.Switch(jen.Id("key")).Block(
 					loop...,
 				),
