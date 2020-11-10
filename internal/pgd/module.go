@@ -63,8 +63,10 @@ func (m *Module) processFile(f pgs.File) {
 
 const (
 	dynamoPkg  = "github.com/aws/aws-sdk-go/service/dynamodb"
+	protoPkg   = "github.com/golang/protobuf/proto"
 	awsPkg     = "github.com/aws/aws-sdk-go/aws"
 	strconvPkg = "strconv"
+	fmtPkg     = "fmt"
 )
 
 func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
@@ -77,7 +79,9 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 
 	f.ImportName(dynamoPkg, "dynamodb")
 	f.ImportName(awsPkg, "aws")
+	f.ImportName(protoPkg, "proto")
 	f.ImportName(strconvPkg, "strconv")
+	f.ImportName(fmtPkg, "fmt")
 
 	// https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Marshaler
 	// https://godoc.org/github.com/guregu/dynamo#Marshaler
@@ -172,12 +176,17 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 				jen.Return(jen.Nil(), jen.Id("err")),
 			),
 			jen.Return(jen.Id("av"), jen.Nil()),
-		)
+		).Line()
 
 		stmts := []jen.Code{}
 		refId := 0
 		d := jen.Dict{}
+		needErr := false
 		needNullBoolTrue := false
+		needStructCopy := false
+		needProtoBuffer := false
+		const structCopy = "structCopy"
+		const protoBuffer = "pbuf"
 		for _, field := range msg.Fields() {
 			fext := dynamopb.DynamoFieldOptions{}
 			ok, err := field.Extension(dynamopb.E_Field, &fext)
@@ -191,10 +200,6 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			if fext.Type == nil {
 				fext.Type = &dynamopb.Types{}
 			}
-			if fext.Type.Binary {
-				// TOOD(impl)
-				// special case: store whole field as protobuf marshled force binary encoded
-			}
 
 			pt := field.Type().ProtoType()
 
@@ -203,6 +208,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			vname := fmt.Sprintf("v%d", refId)
 			arrix := fmt.Sprintf("ix%d", refId)
 			arrname := fmt.Sprintf("arr%d", refId)
+
 			isArray := field.Type().ProtoLabel() == pgs.Repeated
 			if fext.Type.Set && !isArray {
 				m.Failf("Error: dynamo.field.set=true, but field is not repeated / array type: '%s'.IsRepeated=%v",
@@ -210,6 +216,27 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			}
 
 			avt := getAVType(field, &fext)
+
+			if fext.Type.Binary {
+				needStructCopy = true
+				needProtoBuffer = true
+				needErr = true
+
+				// special case: store whole field as protobuf marshaled force binary encoded
+				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+				stmts = append(stmts, jen.Id(structCopy).Dot("Reset").Call())
+				stmts = append(stmts, jen.Id(protoBuffer).Dot("Reset").Call())
+				stmts = append(stmts, jen.Id(structCopy).Dot(srcName).Op("=").Id("p").Dot(srcName))
+				stmts = append(stmts, jen.Id("err").Op("=").Id(protoBuffer).Dot("Marshal").Call(jen.Id(structCopy)))
+				stmts = append(stmts,
+					jen.If(jen.Id("err").Op("!=").Nil()).Block(
+						jen.Return(jen.Id("err")),
+					),
+				)
+				stmts = append(stmts, jen.Id(vname).Dot("B").Op("=").Id(protoBuffer).Dot("Bytes").Call())
+				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Id(vname)
+			}
+
 			switch avt {
 			case avt_bytes:
 				needNullBoolTrue = true
@@ -291,9 +318,13 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 				)
 				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Id(vname)
 			case avt_string_set, avt_number_set, avt_byte_set:
+				arrT := jen.Op("[]*").Id("string")
+				if avt == avt_byte_set {
+					arrT = jen.Op("[][]").Id("byte")
+				}
 				stmts = append(stmts,
 					jen.Id(arrname).Op(":=").Make(
-						jen.Op("[]*").Id("string"),
+						arrT,
 						jen.Lit(0),
 						jen.Len(jen.Id("p").Dot(srcName)),
 					),
@@ -358,6 +389,24 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			}, stmts...)
 		}
 
+		if needStructCopy {
+			stmts = append([]jen.Code{
+				jen.Id(structCopy).Op(":=").Op("&").Id(structName.String()).Values(),
+			}, stmts...)
+		}
+
+		if needProtoBuffer {
+			stmts = append([]jen.Code{
+				jen.Id(protoBuffer).Op(":=").Qual(protoPkg, "NewBuffer").Call(jen.Nil()),
+			}, stmts...)
+		}
+
+		if needErr {
+			stmts = append([]jen.Code{
+				jen.Op("var").Id("err").Id("error"),
+			}, stmts...)
+		}
+
 		stmts = append(stmts, jen.Id("av").Dot("M").Op("=").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue").Values(d))
 
 		stmts = append(stmts, jen.Return(jen.Nil()))
@@ -365,7 +414,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			jen.Id("p").Op("*").Id(structName.String()),
 		).Id("MarshalDynamoDBAttributeValue").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
 			stmts...,
-		)
+		).Line()
 	}
 	return nil
 }
@@ -385,6 +434,7 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 		}
 
 		stmts := []jen.Code{}
+		needErr := false
 		loop := []jen.Code{}
 		for _, field := range msg.Fields() {
 			fext := dynamopb.DynamoFieldOptions{}
@@ -399,15 +449,55 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 			if fext.Type == nil {
 				fext.Type = &dynamopb.Types{}
 			}
-			unm := []jen.Code{}
+			pt := field.Type().ProtoType()
+			dstName := field.Name().UpperCamelCase().String()
 
-			avt := getAVType(field, &fext)
-			switch avt {
-			case
-			}
-			loop = append(loop, jen.Case(jen.Lit(field.Name().LowerSnakeCase().String())).Block(
-				unm...,
-			))
+			loop = append(loop, jen.Case(jen.Lit(field.Name().LowerSnakeCase().String())).BlockFunc(func(g *jen.Group) {
+				avt := getAVType(field, &fext)
+				switch avt {
+				case avt_bytes:
+					g.Id("p").Dot(dstName).Op("=").Id("av").Dot("B")
+				case avt_bool:
+					g.Id("p").Dot(dstName).Op("=").Qual(awsPkg, "BoolValue").Call(jen.Id("av").Dot("BOOL"))
+				case avt_byte_set:
+					panic("not done")
+				case avt_list:
+					panic("not done")
+				case avt_map:
+					panic("not done")
+				case avt_number:
+					needErr = true
+					np := numberParseStatement(pt, jen.Id("av").Dot("N"))
+					g.List(jen.Id("p").Dot(dstName), jen.Id("err")).Op("=").Add(np)
+					g.If(jen.Id("err").Op("!=").Nil()).Block(
+						jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+							jen.Lit(fmt.Sprintf("%s: Failed to parse '%s' as number: %s", field.FullyQualifiedName(), "%s", "%w")),
+							jen.Qual(awsPkg, "StringValue").Call(jen.Id("av").Dot("N")),
+							jen.Id("err"),
+						)),
+					)
+				case avt_number_set:
+					panic("not done")
+				case avt_null:
+					// no op
+				case avt_string:
+					g.If(jen.Qual(awsPkg, "BoolValue").Call(jen.Id("av").Dot("NULL"))).Block(
+						jen.Id("p").Dot(dstName).Op("=").Lit(""),
+					).Else().Block(
+						jen.Id("p").Dot(dstName).Op("=").Qual(awsPkg, "StringValue").Call(
+							jen.Id("av").Dot("S"),
+						),
+					)
+				case avt_string_set:
+					panic("not done")
+				}
+			}))
+		}
+
+		if needErr {
+			stmts = append([]jen.Code{
+				jen.Var().Id("err").Error(),
+			}, stmts...)
 		}
 
 		stmts = append(stmts,
@@ -424,13 +514,13 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 			jen.Id("p").Op("*").Id(structName.String()),
 		).Id("UnmarshalDynamoDBAttributeValue").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
 			stmts...,
-		)
+		).Line()
 
 		f.Func().Params(
 			jen.Id("p").Op("*").Id(structName.String()),
 		).Id("UnmarshalDynamo").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
 			jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(jen.Id("av"))),
-		)
+		).Line()
 	}
 	return nil
 }
@@ -454,6 +544,30 @@ func numberFormatStatement(pt pgs.ProtoType, access *jen.Statement) *jen.Stateme
 		rv = jen.Qual(strconvPkg, "FormatUint").Call(
 			jen.Id("uint64").Call(access),
 			jen.Lit(10),
+		)
+	}
+	return rv
+}
+
+func numberParseStatement(pt pgs.ProtoType, access *jen.Statement) *jen.Statement {
+	var rv *jen.Statement
+	switch pt {
+	case pgs.DoubleT, pgs.FloatT:
+		rv = jen.Qual(strconvPkg, "ParseFloat").Call(
+			jen.Qual(awsPkg, "StringValue").Call(access),
+			jen.Lit(64),
+		)
+	case pgs.Int64T, pgs.SFixed64, pgs.SInt64, pgs.Int32T, pgs.SFixed32, pgs.SInt32:
+		rv = jen.Qual(strconvPkg, "ParseInt").Call(
+			jen.Qual(awsPkg, "StringValue").Call(access),
+			jen.Lit(10),
+			jen.Lit(64),
+		)
+	case pgs.UInt64T, pgs.Fixed64T, pgs.UInt32T, pgs.Fixed32T:
+		rv = jen.Qual(strconvPkg, "ParseUint").Call(
+			jen.Qual(awsPkg, "StringValue").Call(access),
+			jen.Lit(10),
+			jen.Lit(64),
 		)
 	}
 	return rv

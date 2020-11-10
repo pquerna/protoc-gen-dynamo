@@ -3,7 +3,6 @@ syntax = "proto3";
 package dynamo;
 
 option go_package = "github.com/pquerna/protoc-gen-dynamo/dynamo";
-
 import "google/protobuf/descriptor.proto";
 
 // TODO(pquerna): register here https://github.com/protocolbuffers/protobuf/blob/master/docs/options.md

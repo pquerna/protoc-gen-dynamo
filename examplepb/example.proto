@@ -15,6 +15,7 @@ message Store {
   bool closed = 6;
   google.protobuf.Timestamp opening_date = 7 [(dynamo.field).type.unix_second = true];
   repeated string best_employee_ids = 8 [(dynamo.field).type.set = true];
+  google.protobuf.Timestamp bin_date = 9 [(dynamo.field).type.binary = true];
 
   uint64 foo =99;
   repeated uint64 morefoo = 100 [(dynamo.field).type.set = true];
