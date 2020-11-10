@@ -61,9 +61,9 @@ func (c *DynamoDB) BatchGetItemRequest(input *BatchGetItemInput) (req *request.R
 
 	output = &BatchGetItemOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -162,9 +162,9 @@ func (c *DynamoDB) BatchGetItemRequest(input *BatchGetItemInput) (req *request.R
 //   might not be specified correctly, or its status might not be ACTIVE.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -282,9 +282,9 @@ func (c *DynamoDB) BatchWriteItemRequest(input *BatchWriteItemInput) (req *reque
 
 	output = &BatchWriteItemOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -408,9 +408,9 @@ func (c *DynamoDB) BatchWriteItemRequest(input *BatchWriteItemInput) (req *reque
 //   that have one or more local secondary indexes.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -476,9 +476,9 @@ func (c *DynamoDB) CreateBackupRequest(input *CreateBackupInput) (req *request.R
 
 	output = &CreateBackupOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -570,7 +570,7 @@ func (c *DynamoDB) CreateBackupRequest(input *CreateBackupInput) (req *request.R
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -636,9 +636,9 @@ func (c *DynamoDB) CreateGlobalTableRequest(input *CreateGlobalTableInput) (req 
 
 	output = &CreateGlobalTableOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -670,7 +670,7 @@ func (c *DynamoDB) CreateGlobalTableRequest(input *CreateGlobalTableInput) (req 
 // relationship between two or more DynamoDB tables with the same table name
 // in the provided Regions.
 //
-// This method only applies to Version 2017.11.29 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V1.html)
+// This operation only applies to Version 2017.11.29 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V1.html)
 // of global tables.
 //
 // If you want to add a new replica table to a global table, each of the following
@@ -691,6 +691,14 @@ func (c *DynamoDB) CreateGlobalTableRequest(input *CreateGlobalTableInput) (req 
 //    * The global secondary indexes must have the same name.
 //
 //    * The global secondary indexes must have the same hash key and sort key
+//    (if present).
+//
+// If local secondary indexes are specified, then the following conditions must
+// also be met:
+//
+//    * The local secondary indexes must have the same name.
+//
+//    * The local secondary indexes must have the same hash key and sort key
 //    (if present).
 //
 // Write capacity settings should be set consistently across your replica tables
@@ -723,7 +731,7 @@ func (c *DynamoDB) CreateGlobalTableRequest(input *CreateGlobalTableInput) (req 
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -796,9 +804,9 @@ func (c *DynamoDB) CreateTableRequest(input *CreateTableInput) (req *request.Req
 
 	output = &CreateTableOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -867,7 +875,7 @@ func (c *DynamoDB) CreateTableRequest(input *CreateTableInput) (req *request.Req
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -933,9 +941,9 @@ func (c *DynamoDB) DeleteBackupRequest(input *DeleteBackupInput) (req *request.R
 
 	output = &DeleteBackupOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -994,7 +1002,7 @@ func (c *DynamoDB) DeleteBackupRequest(input *DeleteBackupInput) (req *request.R
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -1060,9 +1068,9 @@ func (c *DynamoDB) DeleteItemRequest(input *DeleteItemInput) (req *request.Reque
 
 	output = &DeleteItemOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -1136,9 +1144,9 @@ func (c *DynamoDB) DeleteItemRequest(input *DeleteItemInput) (req *request.Reque
 //   Operation was rejected because there is an ongoing transaction for the item.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -1204,9 +1212,9 @@ func (c *DynamoDB) DeleteTableRequest(input *DeleteTableInput) (req *request.Req
 
 	output = &DeleteTableOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -1282,7 +1290,7 @@ func (c *DynamoDB) DeleteTableRequest(input *DeleteTableInput) (req *request.Req
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -1348,9 +1356,9 @@ func (c *DynamoDB) DescribeBackupRequest(input *DescribeBackupInput) (req *reque
 
 	output = &DescribeBackupOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -1457,9 +1465,9 @@ func (c *DynamoDB) DescribeContinuousBackupsRequest(input *DescribeContinuousBac
 
 	output = &DescribeContinuousBackupsOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -1768,6 +1776,102 @@ func (d *discovererDescribeEndpoints) Handler(r *request.Request) {
 	}
 }
 
+const opDescribeExport = "DescribeExport"
+
+// DescribeExportRequest generates a "aws/request.Request" representing the
+// client's request for the DescribeExport operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See DescribeExport for more information on using the DescribeExport
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the DescribeExportRequest method.
+//    req, resp := client.DescribeExportRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeExport
+func (c *DynamoDB) DescribeExportRequest(input *DescribeExportInput) (req *request.Request, output *DescribeExportOutput) {
+	op := &request.Operation{
+		Name:       opDescribeExport,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &DescribeExportInput{}
+	}
+
+	output = &DescribeExportOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// DescribeExport API operation for Amazon DynamoDB.
+//
+// Describes an existing table export.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon DynamoDB's
+// API operation DescribeExport for usage and error information.
+//
+// Returned Error Types:
+//   * ExportNotFoundException
+//   The specified export was not found.
+//
+//   * LimitExceededException
+//   There is no limit to the number of daily on-demand backups that can be taken.
+//
+//   Up to 50 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, RestoreTableFromBackup,
+//   and RestoreTableToPointInTime.
+//
+//   The only exception is when you are creating a table with one or more secondary
+//   indexes. You can have up to 25 such requests running at a time; however,
+//   if the table or index specifications are complex, DynamoDB might temporarily
+//   reduce the number of concurrent operations.
+//
+//   There is a soft account quota of 256 tables.
+//
+//   * InternalServerError
+//   An error occurred on the server side.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/DescribeExport
+func (c *DynamoDB) DescribeExport(input *DescribeExportInput) (*DescribeExportOutput, error) {
+	req, out := c.DescribeExportRequest(input)
+	return out, req.Send()
+}
+
+// DescribeExportWithContext is the same as DescribeExport with the addition of
+// the ability to pass a context and additional request options.
+//
+// See DescribeExport for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *DynamoDB) DescribeExportWithContext(ctx aws.Context, input *DescribeExportInput, opts ...request.Option) (*DescribeExportOutput, error) {
+	req, out := c.DescribeExportRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
 const opDescribeGlobalTable = "DescribeGlobalTable"
 
 // DescribeGlobalTableRequest generates a "aws/request.Request" representing the
@@ -1807,9 +1911,9 @@ func (c *DynamoDB) DescribeGlobalTableRequest(input *DescribeGlobalTableInput) (
 
 	output = &DescribeGlobalTableOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -1839,8 +1943,10 @@ func (c *DynamoDB) DescribeGlobalTableRequest(input *DescribeGlobalTableInput) (
 //
 // Returns information about the specified global table.
 //
-// This method only applies to Version 2017.11.29 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V1.html)
-// of global tables.
+// This operation only applies to Version 2017.11.29 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V1.html)
+// of global tables. If you are using global tables Version 2019.11.21 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html)
+// you can use DescribeTable (https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_DescribeTable.html)
+// instead.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
 // with awserr.Error's Code and Message methods to get detailed information about
@@ -1917,9 +2023,9 @@ func (c *DynamoDB) DescribeGlobalTableSettingsRequest(input *DescribeGlobalTable
 
 	output = &DescribeGlobalTableSettingsOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -1949,7 +2055,7 @@ func (c *DynamoDB) DescribeGlobalTableSettingsRequest(input *DescribeGlobalTable
 //
 // Describes Region-specific settings for a global table.
 //
-// This method only applies to Version 2017.11.29 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V1.html)
+// This operation only applies to Version 2017.11.29 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V1.html)
 // of global tables.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
@@ -2027,9 +2133,9 @@ func (c *DynamoDB) DescribeLimitsRequest(input *DescribeLimitsInput) (req *reque
 
 	output = &DescribeLimitsOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -2057,27 +2163,27 @@ func (c *DynamoDB) DescribeLimitsRequest(input *DescribeLimitsInput) (req *reque
 
 // DescribeLimits API operation for Amazon DynamoDB.
 //
-// Returns the current provisioned-capacity limits for your AWS account in a
+// Returns the current provisioned-capacity quotas for your AWS account in a
 // Region, both for the Region as a whole and for any one DynamoDB table that
 // you create there.
 //
-// When you establish an AWS account, the account has initial limits on the
+// When you establish an AWS account, the account has initial quotas on the
 // maximum read capacity units and write capacity units that you can provision
 // across all of your DynamoDB tables in a given Region. Also, there are per-table
-// limits that apply when you create a table there. For more information, see
-// Limits (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
+// quotas that apply when you create a table there. For more information, see
+// Service, Account, and Table Quotas (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 // page in the Amazon DynamoDB Developer Guide.
 //
-// Although you can increase these limits by filing a case at AWS Support Center
+// Although you can increase these quotas by filing a case at AWS Support Center
 // (https://console.aws.amazon.com/support/home#/), obtaining the increase is
 // not instantaneous. The DescribeLimits action lets you write code to compare
-// the capacity you are currently using to those limits imposed by your account
-// so that you have enough time to apply for an increase before you hit a limit.
+// the capacity you are currently using to those quotas imposed by your account
+// so that you have enough time to apply for an increase before you hit a quota.
 //
 // For example, you could use one of the AWS SDKs to do the following:
 //
 // Call DescribeLimits for a particular Region to obtain your current account
-// limits on provisioned capacity there.
+// quotas on provisioned capacity there.
 //
 // Create a variable to hold the aggregate read capacity units provisioned for
 // all your tables in that Region, and one to hold the aggregate write capacity
@@ -2096,20 +2202,20 @@ func (c *DynamoDB) DescribeLimitsRequest(input *DescribeLimitsInput) (req *reque
 //    these GSIs and add their provisioned capacity values to your variables
 //    as well.
 //
-// Report the account limits for that Region returned by DescribeLimits, along
+// Report the account quotas for that Region returned by DescribeLimits, along
 // with the total current provisioned capacity levels you have calculated.
 //
 // This will let you see whether you are getting close to your account-level
-// limits.
+// quotas.
 //
-// The per-table limits apply only when you are creating a new table. They restrict
+// The per-table quotas apply only when you are creating a new table. They restrict
 // the sum of the provisioned capacity of the new table itself and all its global
 // secondary indexes.
 //
 // For existing tables and their GSIs, DynamoDB doesn't let you increase provisioned
-// capacity extremely rapidly. But the only upper limit that applies is that
-// the aggregate provisioned capacity over all your tables and GSIs cannot exceed
-// either of the per-account limits.
+// capacity extremely rapidly, but the only quota that applies is that the aggregate
+// provisioned capacity over all your tables and GSIs cannot exceed either of
+// the per-account quotas.
 //
 // DescribeLimits should only be called periodically. You can expect throttling
 // errors if you call it more than once in a minute.
@@ -2188,9 +2294,9 @@ func (c *DynamoDB) DescribeTableRequest(input *DescribeTableInput) (req *request
 
 	output = &DescribeTableOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -2311,7 +2417,7 @@ func (c *DynamoDB) DescribeTableReplicaAutoScalingRequest(input *DescribeTableRe
 //
 // Describes auto scaling settings across replicas of the global table at once.
 //
-// This method only applies to Version 2019.11.21 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html)
+// This operation only applies to Version 2019.11.21 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html)
 // of global tables.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
@@ -2390,9 +2496,9 @@ func (c *DynamoDB) DescribeTimeToLiveRequest(input *DescribeTimeToLiveInput) (re
 
 	output = &DescribeTimeToLiveOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -2459,6 +2565,114 @@ func (c *DynamoDB) DescribeTimeToLiveWithContext(ctx aws.Context, input *Describ
 	return out, req.Send()
 }
 
+const opExportTableToPointInTime = "ExportTableToPointInTime"
+
+// ExportTableToPointInTimeRequest generates a "aws/request.Request" representing the
+// client's request for the ExportTableToPointInTime operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See ExportTableToPointInTime for more information on using the ExportTableToPointInTime
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the ExportTableToPointInTimeRequest method.
+//    req, resp := client.ExportTableToPointInTimeRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ExportTableToPointInTime
+func (c *DynamoDB) ExportTableToPointInTimeRequest(input *ExportTableToPointInTimeInput) (req *request.Request, output *ExportTableToPointInTimeOutput) {
+	op := &request.Operation{
+		Name:       opExportTableToPointInTime,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+	}
+
+	if input == nil {
+		input = &ExportTableToPointInTimeInput{}
+	}
+
+	output = &ExportTableToPointInTimeOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// ExportTableToPointInTime API operation for Amazon DynamoDB.
+//
+// Exports table data to an S3 bucket. The table must have point in time recovery
+// enabled, and you can export data from any time within the point in time recovery
+// window.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon DynamoDB's
+// API operation ExportTableToPointInTime for usage and error information.
+//
+// Returned Error Types:
+//   * TableNotFoundException
+//   A source table with the name TableName does not currently exist within the
+//   subscriber's account.
+//
+//   * PointInTimeRecoveryUnavailableException
+//   Point in time recovery has not yet been enabled for this source table.
+//
+//   * LimitExceededException
+//   There is no limit to the number of daily on-demand backups that can be taken.
+//
+//   Up to 50 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, RestoreTableFromBackup,
+//   and RestoreTableToPointInTime.
+//
+//   The only exception is when you are creating a table with one or more secondary
+//   indexes. You can have up to 25 such requests running at a time; however,
+//   if the table or index specifications are complex, DynamoDB might temporarily
+//   reduce the number of concurrent operations.
+//
+//   There is a soft account quota of 256 tables.
+//
+//   * InvalidExportTimeException
+//   The specified ExportTime is outside of the point in time recovery window.
+//
+//   * ExportConflictException
+//   There was a conflict when writing to the specified S3 bucket.
+//
+//   * InternalServerError
+//   An error occurred on the server side.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ExportTableToPointInTime
+func (c *DynamoDB) ExportTableToPointInTime(input *ExportTableToPointInTimeInput) (*ExportTableToPointInTimeOutput, error) {
+	req, out := c.ExportTableToPointInTimeRequest(input)
+	return out, req.Send()
+}
+
+// ExportTableToPointInTimeWithContext is the same as ExportTableToPointInTime with the addition of
+// the ability to pass a context and additional request options.
+//
+// See ExportTableToPointInTime for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *DynamoDB) ExportTableToPointInTimeWithContext(ctx aws.Context, input *ExportTableToPointInTimeInput, opts ...request.Option) (*ExportTableToPointInTimeOutput, error) {
+	req, out := c.ExportTableToPointInTimeRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
 const opGetItem = "GetItem"
 
 // GetItemRequest generates a "aws/request.Request" representing the
@@ -2498,9 +2712,9 @@ func (c *DynamoDB) GetItemRequest(input *GetItemInput) (req *request.Request, ou
 
 	output = &GetItemOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -2558,9 +2772,9 @@ func (c *DynamoDB) GetItemRequest(input *GetItemInput) (req *request.Request, ou
 //   might not be specified correctly, or its status might not be ACTIVE.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -2626,9 +2840,9 @@ func (c *DynamoDB) ListBackupsRequest(input *ListBackupsInput) (req *request.Req
 
 	output = &ListBackupsOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -2658,11 +2872,11 @@ func (c *DynamoDB) ListBackupsRequest(input *ListBackupsInput) (req *request.Req
 //
 // List backups associated with an AWS account. To list backups for a given
 // table, specify TableName. ListBackups returns a paginated list of results
-// with at most 1 MB worth of items in a page. You can also specify a limit
-// for the maximum number of entries to be returned in a page.
+// with at most 1 MB worth of items in a page. You can also specify a maximum
+// number of entries to be returned in a page.
 //
 // In the request, start time is inclusive, but end time is exclusive. Note
-// that these limits are for the time at which the original backup was requested.
+// that these boundaries are for the time at which the original backup was requested.
 //
 // You can call ListBackups a maximum of five times per second.
 //
@@ -2841,6 +3055,157 @@ func (c *DynamoDB) ListContributorInsightsPagesWithContext(ctx aws.Context, inpu
 	return p.Err()
 }
 
+const opListExports = "ListExports"
+
+// ListExportsRequest generates a "aws/request.Request" representing the
+// client's request for the ListExports operation. The "output" return
+// value will be populated with the request's response once the request completes
+// successfully.
+//
+// Use "Send" method on the returned Request to send the API call to the service.
+// the "output" return value is not valid until after Send returns without error.
+//
+// See ListExports for more information on using the ListExports
+// API call, and error handling.
+//
+// This method is useful when you want to inject custom logic or configuration
+// into the SDK's request lifecycle. Such as custom headers, or retry logic.
+//
+//
+//    // Example sending a request using the ListExportsRequest method.
+//    req, resp := client.ListExportsRequest(params)
+//
+//    err := req.Send()
+//    if err == nil { // resp is now filled
+//        fmt.Println(resp)
+//    }
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListExports
+func (c *DynamoDB) ListExportsRequest(input *ListExportsInput) (req *request.Request, output *ListExportsOutput) {
+	op := &request.Operation{
+		Name:       opListExports,
+		HTTPMethod: "POST",
+		HTTPPath:   "/",
+		Paginator: &request.Paginator{
+			InputTokens:     []string{"NextToken"},
+			OutputTokens:    []string{"NextToken"},
+			LimitToken:      "MaxResults",
+			TruncationToken: "",
+		},
+	}
+
+	if input == nil {
+		input = &ListExportsInput{}
+	}
+
+	output = &ListExportsOutput{}
+	req = c.newRequest(op, input, output)
+	return
+}
+
+// ListExports API operation for Amazon DynamoDB.
+//
+// Lists completed exports within the past 90 days.
+//
+// Returns awserr.Error for service API and SDK errors. Use runtime type assertions
+// with awserr.Error's Code and Message methods to get detailed information about
+// the error.
+//
+// See the AWS API reference guide for Amazon DynamoDB's
+// API operation ListExports for usage and error information.
+//
+// Returned Error Types:
+//   * LimitExceededException
+//   There is no limit to the number of daily on-demand backups that can be taken.
+//
+//   Up to 50 simultaneous table operations are allowed per account. These operations
+//   include CreateTable, UpdateTable, DeleteTable,UpdateTimeToLive, RestoreTableFromBackup,
+//   and RestoreTableToPointInTime.
+//
+//   The only exception is when you are creating a table with one or more secondary
+//   indexes. You can have up to 25 such requests running at a time; however,
+//   if the table or index specifications are complex, DynamoDB might temporarily
+//   reduce the number of concurrent operations.
+//
+//   There is a soft account quota of 256 tables.
+//
+//   * InternalServerError
+//   An error occurred on the server side.
+//
+// See also, https://docs.aws.amazon.com/goto/WebAPI/dynamodb-2012-08-10/ListExports
+func (c *DynamoDB) ListExports(input *ListExportsInput) (*ListExportsOutput, error) {
+	req, out := c.ListExportsRequest(input)
+	return out, req.Send()
+}
+
+// ListExportsWithContext is the same as ListExports with the addition of
+// the ability to pass a context and additional request options.
+//
+// See ListExports for details on how to use this API operation.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *DynamoDB) ListExportsWithContext(ctx aws.Context, input *ListExportsInput, opts ...request.Option) (*ListExportsOutput, error) {
+	req, out := c.ListExportsRequest(input)
+	req.SetContext(ctx)
+	req.ApplyOptions(opts...)
+	return out, req.Send()
+}
+
+// ListExportsPages iterates over the pages of a ListExports operation,
+// calling the "fn" function with the response data for each page. To stop
+// iterating, return false from the fn function.
+//
+// See ListExports method for more information on how to use this operation.
+//
+// Note: This operation can generate multiple requests to a service.
+//
+//    // Example iterating over at most 3 pages of a ListExports operation.
+//    pageNum := 0
+//    err := client.ListExportsPages(params,
+//        func(page *dynamodb.ListExportsOutput, lastPage bool) bool {
+//            pageNum++
+//            fmt.Println(page)
+//            return pageNum <= 3
+//        })
+//
+func (c *DynamoDB) ListExportsPages(input *ListExportsInput, fn func(*ListExportsOutput, bool) bool) error {
+	return c.ListExportsPagesWithContext(aws.BackgroundContext(), input, fn)
+}
+
+// ListExportsPagesWithContext same as ListExportsPages except
+// it takes a Context and allows setting request options on the pages.
+//
+// The context must be non-nil and will be used for request cancellation. If
+// the context is nil a panic will occur. In the future the SDK may create
+// sub-contexts for http.Requests. See https://golang.org/pkg/context/
+// for more information on using Contexts.
+func (c *DynamoDB) ListExportsPagesWithContext(ctx aws.Context, input *ListExportsInput, fn func(*ListExportsOutput, bool) bool, opts ...request.Option) error {
+	p := request.Pagination{
+		NewRequest: func() (*request.Request, error) {
+			var inCpy *ListExportsInput
+			if input != nil {
+				tmp := *input
+				inCpy = &tmp
+			}
+			req, _ := c.ListExportsRequest(inCpy)
+			req.SetContext(ctx)
+			req.ApplyOptions(opts...)
+			return req, nil
+		},
+	}
+
+	for p.Next() {
+		if !fn(p.Page().(*ListExportsOutput), !p.HasNextPage()) {
+			break
+		}
+	}
+
+	return p.Err()
+}
+
 const opListGlobalTables = "ListGlobalTables"
 
 // ListGlobalTablesRequest generates a "aws/request.Request" representing the
@@ -2880,9 +3245,9 @@ func (c *DynamoDB) ListGlobalTablesRequest(input *ListGlobalTablesInput) (req *r
 
 	output = &ListGlobalTablesOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -2912,7 +3277,7 @@ func (c *DynamoDB) ListGlobalTablesRequest(input *ListGlobalTablesInput) (req *r
 //
 // Lists all global tables that have a replica in the specified Region.
 //
-// This method only applies to Version 2017.11.29 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V1.html)
+// This operation only applies to Version 2017.11.29 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V1.html)
 // of global tables.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
@@ -2993,9 +3358,9 @@ func (c *DynamoDB) ListTablesRequest(input *ListTablesInput) (req *request.Reque
 
 	output = &ListTablesOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -3151,9 +3516,9 @@ func (c *DynamoDB) ListTagsOfResourceRequest(input *ListTagsOfResourceInput) (re
 
 	output = &ListTagsOfResourceOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -3263,9 +3628,9 @@ func (c *DynamoDB) PutItemRequest(input *PutItemInput) (req *request.Request, ou
 
 	output = &PutItemOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -3325,9 +3690,15 @@ func (c *DynamoDB) PutItemRequest(input *PutItemInput) (req *request.Request, ou
 //    * PutItem in the AWS SDK for Ruby V2 (http://docs.aws.amazon.com/goto/SdkForRubyV2/dynamodb-2012-08-10/PutItem)
 //
 // When you add an item, the primary key attributes are the only required attributes.
-// Attribute values cannot be null. String and Binary type attributes must have
-// lengths greater than zero. Set type attributes cannot be empty. Requests
-// with empty values will be rejected with a ValidationException exception.
+// Attribute values cannot be null.
+//
+// Empty String and Binary attribute values are allowed. Attribute values of
+// type String and Binary must have a length greater than zero if the attribute
+// is used as a key attribute for a table or index. Set type attributes cannot
+// be empty.
+//
+// Invalid Requests with empty values will be rejected with a ValidationException
+// exception.
 //
 // To prevent a new item from replacing an existing item, use a conditional
 // expression that contains the attribute_not_exists function with the name
@@ -3369,9 +3740,9 @@ func (c *DynamoDB) PutItemRequest(input *PutItemInput) (req *request.Request, ou
 //   Operation was rejected because there is an ongoing transaction for the item.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -3443,9 +3814,9 @@ func (c *DynamoDB) QueryRequest(input *QueryInput) (req *request.Request, output
 
 	output = &QueryOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -3543,9 +3914,9 @@ func (c *DynamoDB) QueryRequest(input *QueryInput) (req *request.Request, output
 //   might not be specified correctly, or its status might not be ACTIVE.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -3663,9 +4034,9 @@ func (c *DynamoDB) RestoreTableFromBackupRequest(input *RestoreTableFromBackupIn
 
 	output = &RestoreTableFromBackupOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -3745,7 +4116,7 @@ func (c *DynamoDB) RestoreTableFromBackupRequest(input *RestoreTableFromBackupIn
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -3811,9 +4182,9 @@ func (c *DynamoDB) RestoreTableToPointInTimeRequest(input *RestoreTableToPointIn
 
 	output = &RestoreTableToPointInTimeOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -3908,7 +4279,7 @@ func (c *DynamoDB) RestoreTableToPointInTimeRequest(input *RestoreTableToPointIn
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InvalidRestoreTimeException
 //   An invalid restore time was specified. RestoreDateTime must be between EarliestRestorableDateTime
@@ -3987,9 +4358,9 @@ func (c *DynamoDB) ScanRequest(input *ScanInput) (req *request.Request, output *
 
 	output = &ScanOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -4067,9 +4438,9 @@ func (c *DynamoDB) ScanRequest(input *ScanInput) (req *request.Request, output *
 //   might not be specified correctly, or its status might not be ACTIVE.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -4188,9 +4559,9 @@ func (c *DynamoDB) TagResourceRequest(input *TagResourceInput) (req *request.Req
 	output = &TagResourceOutput{}
 	req = c.newRequest(op, input, output)
 	req.Handlers.Unmarshal.Swap(jsonrpc.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -4246,7 +4617,7 @@ func (c *DynamoDB) TagResourceRequest(input *TagResourceInput) (req *request.Req
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * ResourceNotFoundException
 //   The operation tried to access a nonexistent table or index. The resource
@@ -4321,9 +4692,9 @@ func (c *DynamoDB) TransactGetItemsRequest(input *TransactGetItemsInput) (req *r
 
 	output = &TransactGetItemsOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -4480,9 +4851,9 @@ func (c *DynamoDB) TransactGetItemsRequest(input *TransactGetItemsInput) (req *r
 //   in the Amazon DynamoDB Developer Guide.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -4548,9 +4919,9 @@ func (c *DynamoDB) TransactWriteItemsRequest(input *TransactWriteItemsInput) (re
 
 	output = &TransactWriteItemsOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -4748,9 +5119,9 @@ func (c *DynamoDB) TransactWriteItemsRequest(input *TransactWriteItemsInput) (re
 //   in the Amazon DynamoDB Developer Guide.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -4817,9 +5188,9 @@ func (c *DynamoDB) UntagResourceRequest(input *UntagResourceInput) (req *request
 	output = &UntagResourceOutput{}
 	req = c.newRequest(op, input, output)
 	req.Handlers.Unmarshal.Swap(jsonrpc.UnmarshalHandler.Name, protocol.UnmarshalDiscardBodyHandler)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -4873,7 +5244,7 @@ func (c *DynamoDB) UntagResourceRequest(input *UntagResourceInput) (req *request
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * ResourceNotFoundException
 //   The operation tried to access a nonexistent table or index. The resource
@@ -4948,9 +5319,9 @@ func (c *DynamoDB) UpdateContinuousBackupsRequest(input *UpdateContinuousBackups
 
 	output = &UpdateContinuousBackupsOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -5152,9 +5523,9 @@ func (c *DynamoDB) UpdateGlobalTableRequest(input *UpdateGlobalTableInput) (req 
 
 	output = &UpdateGlobalTableOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -5288,9 +5659,9 @@ func (c *DynamoDB) UpdateGlobalTableSettingsRequest(input *UpdateGlobalTableSett
 
 	output = &UpdateGlobalTableSettingsOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -5349,7 +5720,7 @@ func (c *DynamoDB) UpdateGlobalTableSettingsRequest(input *UpdateGlobalTableSett
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * ResourceInUseException
 //   The operation conflicts with the resource's availability. For example, you
@@ -5420,9 +5791,9 @@ func (c *DynamoDB) UpdateItemRequest(input *UpdateItemInput) (req *request.Reque
 
 	output = &UpdateItemOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -5490,9 +5861,9 @@ func (c *DynamoDB) UpdateItemRequest(input *UpdateItemInput) (req *request.Reque
 //   Operation was rejected because there is an ongoing transaction for the item.
 //
 //   * RequestLimitExceeded
-//   Throughput exceeds the current throughput limit for your account. Please
+//   Throughput exceeds the current throughput quota for your account. Please
 //   contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-//   a limit increase.
+//   a quota increase.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -5558,9 +5929,9 @@ func (c *DynamoDB) UpdateTableRequest(input *UpdateTableInput) (req *request.Req
 
 	output = &UpdateTableOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -5636,7 +6007,7 @@ func (c *DynamoDB) UpdateTableRequest(input *UpdateTableInput) (req *request.Req
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -5709,7 +6080,7 @@ func (c *DynamoDB) UpdateTableReplicaAutoScalingRequest(input *UpdateTableReplic
 //
 // Updates auto scaling settings on your global tables at once.
 //
-// This method only applies to Version 2019.11.21 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html)
+// This operation only applies to Version 2019.11.21 (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html)
 // of global tables.
 //
 // Returns awserr.Error for service API and SDK errors. Use runtime type assertions
@@ -5741,7 +6112,7 @@ func (c *DynamoDB) UpdateTableReplicaAutoScalingRequest(input *UpdateTableReplic
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -5807,9 +6178,9 @@ func (c *DynamoDB) UpdateTimeToLiveRequest(input *UpdateTimeToLiveInput) (req *r
 
 	output = &UpdateTimeToLiveOutput{}
 	req = c.newRequest(op, input, output)
-	// if a custom endpoint is provided for the request,
-	// we skip endpoint discovery workflow
-	if req.Config.Endpoint == nil {
+	// if custom endpoint for the request is set to a non empty string,
+	// we skip the endpoint discovery workflow.
+	if req.Config.Endpoint == nil || *req.Config.Endpoint == "" {
 		if aws.BoolValue(req.Config.EnableEndpointDiscovery) {
 			de := discovererDescribeEndpoints{
 				Required:      false,
@@ -5895,7 +6266,7 @@ func (c *DynamoDB) UpdateTimeToLiveRequest(input *UpdateTimeToLiveInput) (req *r
 //   if the table or index specifications are complex, DynamoDB might temporarily
 //   reduce the number of concurrent operations.
 //
-//   There is a soft account limit of 256 tables.
+//   There is a soft account quota of 256 tables.
 //
 //   * InternalServerError
 //   An error occurred on the server side.
@@ -6831,12 +7202,12 @@ func newErrorBackupInUseException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s BackupInUseException) Code() string {
+func (s *BackupInUseException) Code() string {
 	return "BackupInUseException"
 }
 
 // Message returns the exception's message.
-func (s BackupInUseException) Message() string {
+func (s *BackupInUseException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -6844,21 +7215,21 @@ func (s BackupInUseException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s BackupInUseException) OrigErr() error {
+func (s *BackupInUseException) OrigErr() error {
 	return nil
 }
 
-func (s BackupInUseException) Error() string {
+func (s *BackupInUseException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s BackupInUseException) StatusCode() int {
+func (s *BackupInUseException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s BackupInUseException) RequestID() string {
+func (s *BackupInUseException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -6887,12 +7258,12 @@ func newErrorBackupNotFoundException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s BackupNotFoundException) Code() string {
+func (s *BackupNotFoundException) Code() string {
 	return "BackupNotFoundException"
 }
 
 // Message returns the exception's message.
-func (s BackupNotFoundException) Message() string {
+func (s *BackupNotFoundException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -6900,21 +7271,21 @@ func (s BackupNotFoundException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s BackupNotFoundException) OrigErr() error {
+func (s *BackupNotFoundException) OrigErr() error {
 	return nil
 }
 
-func (s BackupNotFoundException) Error() string {
+func (s *BackupNotFoundException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s BackupNotFoundException) StatusCode() int {
+func (s *BackupNotFoundException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s BackupNotFoundException) RequestID() string {
+func (s *BackupNotFoundException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -7842,12 +8213,12 @@ func newErrorConditionalCheckFailedException(v protocol.ResponseMetadata) error 
 }
 
 // Code returns the exception type name.
-func (s ConditionalCheckFailedException) Code() string {
+func (s *ConditionalCheckFailedException) Code() string {
 	return "ConditionalCheckFailedException"
 }
 
 // Message returns the exception's message.
-func (s ConditionalCheckFailedException) Message() string {
+func (s *ConditionalCheckFailedException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -7855,21 +8226,21 @@ func (s ConditionalCheckFailedException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s ConditionalCheckFailedException) OrigErr() error {
+func (s *ConditionalCheckFailedException) OrigErr() error {
 	return nil
 }
 
-func (s ConditionalCheckFailedException) Error() string {
+func (s *ConditionalCheckFailedException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s ConditionalCheckFailedException) StatusCode() int {
+func (s *ConditionalCheckFailedException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s ConditionalCheckFailedException) RequestID() string {
+func (s *ConditionalCheckFailedException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -8017,12 +8388,12 @@ func newErrorContinuousBackupsUnavailableException(v protocol.ResponseMetadata) 
 }
 
 // Code returns the exception type name.
-func (s ContinuousBackupsUnavailableException) Code() string {
+func (s *ContinuousBackupsUnavailableException) Code() string {
 	return "ContinuousBackupsUnavailableException"
 }
 
 // Message returns the exception's message.
-func (s ContinuousBackupsUnavailableException) Message() string {
+func (s *ContinuousBackupsUnavailableException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -8030,25 +8401,25 @@ func (s ContinuousBackupsUnavailableException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s ContinuousBackupsUnavailableException) OrigErr() error {
+func (s *ContinuousBackupsUnavailableException) OrigErr() error {
 	return nil
 }
 
-func (s ContinuousBackupsUnavailableException) Error() string {
+func (s *ContinuousBackupsUnavailableException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s ContinuousBackupsUnavailableException) StatusCode() int {
+func (s *ContinuousBackupsUnavailableException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s ContinuousBackupsUnavailableException) RequestID() string {
+func (s *ContinuousBackupsUnavailableException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
-// Represents a Contributor Insights summary entry..
+// Represents a Contributor Insights summary entry.
 type ContributorInsightsSummary struct {
 	_ struct{} `type:"structure"`
 
@@ -8196,8 +8567,8 @@ type CreateGlobalSecondaryIndexAction struct {
 	// Represents the provisioned throughput settings for the specified global secondary
 	// index.
 	//
-	// For current minimum and maximum provisioned throughput values, see Limits
-	// (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
+	// For current minimum and maximum provisioned throughput values, see Service,
+	// Account, and Table Quotas (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 	// in the Amazon DynamoDB Developer Guide.
 	ProvisionedThroughput *ProvisionedThroughput `type:"structure"`
 }
@@ -8599,8 +8970,8 @@ type CreateTableInput struct {
 	// If you set BillingMode as PROVISIONED, you must specify this property. If
 	// you set BillingMode as PAY_PER_REQUEST, you cannot specify this property.
 	//
-	// For current minimum and maximum provisioned throughput values, see Limits
-	// (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
+	// For current minimum and maximum provisioned throughput values, see Service,
+	// Account, and Table Quotas (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 	// in the Amazon DynamoDB Developer Guide.
 	ProvisionedThroughput *ProvisionedThroughput `type:"structure"`
 
@@ -9784,6 +10155,70 @@ func (s *DescribeEndpointsOutput) SetEndpoints(v []*Endpoint) *DescribeEndpoints
 	return s
 }
 
+type DescribeExportInput struct {
+	_ struct{} `type:"structure"`
+
+	// The Amazon Resource Name (ARN) associated with the export.
+	//
+	// ExportArn is a required field
+	ExportArn *string `min:"37" type:"string" required:"true"`
+}
+
+// String returns the string representation
+func (s DescribeExportInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeExportInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *DescribeExportInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "DescribeExportInput"}
+	if s.ExportArn == nil {
+		invalidParams.Add(request.NewErrParamRequired("ExportArn"))
+	}
+	if s.ExportArn != nil && len(*s.ExportArn) < 37 {
+		invalidParams.Add(request.NewErrParamMinLen("ExportArn", 37))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetExportArn sets the ExportArn field's value.
+func (s *DescribeExportInput) SetExportArn(v string) *DescribeExportInput {
+	s.ExportArn = &v
+	return s
+}
+
+type DescribeExportOutput struct {
+	_ struct{} `type:"structure"`
+
+	// Represents the properties of the export.
+	ExportDescription *ExportDescription `type:"structure"`
+}
+
+// String returns the string representation
+func (s DescribeExportOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s DescribeExportOutput) GoString() string {
+	return s.String()
+}
+
+// SetExportDescription sets the ExportDescription field's value.
+func (s *DescribeExportOutput) SetExportDescription(v *ExportDescription) *DescribeExportOutput {
+	s.ExportDescription = v
+	return s
+}
+
 type DescribeGlobalTableInput struct {
 	_ struct{} `type:"structure"`
 
@@ -10444,6 +10879,511 @@ func (s *ExpectedAttributeValue) SetValue(v *AttributeValue) *ExpectedAttributeV
 	return s
 }
 
+// There was a conflict when writing to the specified S3 bucket.
+type ExportConflictException struct {
+	_            struct{}                  `type:"structure"`
+	RespMetadata protocol.ResponseMetadata `json:"-" xml:"-"`
+
+	Message_ *string `locationName:"message" type:"string"`
+}
+
+// String returns the string representation
+func (s ExportConflictException) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ExportConflictException) GoString() string {
+	return s.String()
+}
+
+func newErrorExportConflictException(v protocol.ResponseMetadata) error {
+	return &ExportConflictException{
+		RespMetadata: v,
+	}
+}
+
+// Code returns the exception type name.
+func (s *ExportConflictException) Code() string {
+	return "ExportConflictException"
+}
+
+// Message returns the exception's message.
+func (s *ExportConflictException) Message() string {
+	if s.Message_ != nil {
+		return *s.Message_
+	}
+	return ""
+}
+
+// OrigErr always returns nil, satisfies awserr.Error interface.
+func (s *ExportConflictException) OrigErr() error {
+	return nil
+}
+
+func (s *ExportConflictException) Error() string {
+	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
+}
+
+// Status code returns the HTTP status code for the request's response error.
+func (s *ExportConflictException) StatusCode() int {
+	return s.RespMetadata.StatusCode
+}
+
+// RequestID returns the service's response RequestID for request.
+func (s *ExportConflictException) RequestID() string {
+	return s.RespMetadata.RequestID
+}
+
+// Represents the properties of the exported table.
+type ExportDescription struct {
+	_ struct{} `type:"structure"`
+
+	// The billable size of the table export.
+	BilledSizeBytes *int64 `type:"long"`
+
+	// The client token that was provided for the export task. A client token makes
+	// calls to ExportTableToPointInTimeInput idempotent, meaning that multiple
+	// identical calls have the same effect as one single call.
+	ClientToken *string `type:"string"`
+
+	// The time at which the export task completed.
+	EndTime *time.Time `type:"timestamp"`
+
+	// The Amazon Resource Name (ARN) of the table export.
+	ExportArn *string `min:"37" type:"string"`
+
+	// The format of the exported data. Valid values for ExportFormat are DYNAMODB_JSON
+	// or ION.
+	ExportFormat *string `type:"string" enum:"ExportFormat"`
+
+	// The name of the manifest file for the export task.
+	ExportManifest *string `type:"string"`
+
+	// Export can be in one of the following states: IN_PROGRESS, COMPLETED, or
+	// FAILED.
+	ExportStatus *string `type:"string" enum:"ExportStatus"`
+
+	// Point in time from which table data was exported.
+	ExportTime *time.Time `type:"timestamp"`
+
+	// Status code for the result of the failed export.
+	FailureCode *string `type:"string"`
+
+	// Export failure reason description.
+	FailureMessage *string `type:"string"`
+
+	// The number of items exported.
+	ItemCount *int64 `type:"long"`
+
+	// The name of the Amazon S3 bucket containing the export.
+	S3Bucket *string `type:"string"`
+
+	// The ID of the AWS account that owns the bucket containing the export.
+	S3BucketOwner *string `type:"string"`
+
+	// The Amazon S3 bucket prefix used as the file name and path of the exported
+	// snapshot.
+	S3Prefix *string `type:"string"`
+
+	// Type of encryption used on the bucket where export data is stored. Valid
+	// values for S3SseAlgorithm are:
+	//
+	//    * AES256 - server-side encryption with Amazon S3 managed keys
+	//
+	//    * KMS - server-side encryption with AWS KMS managed keys
+	S3SseAlgorithm *string `type:"string" enum:"S3SseAlgorithm"`
+
+	// The ID of the AWS KMS managed key used to encrypt the S3 bucket where export
+	// data is stored (if applicable).
+	S3SseKmsKeyId *string `min:"1" type:"string"`
+
+	// The time at which the export task began.
+	StartTime *time.Time `type:"timestamp"`
+
+	// The Amazon Resource Name (ARN) of the table that was exported.
+	TableArn *string `type:"string"`
+
+	// Unique ID of the table that was exported.
+	TableId *string `type:"string"`
+}
+
+// String returns the string representation
+func (s ExportDescription) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ExportDescription) GoString() string {
+	return s.String()
+}
+
+// SetBilledSizeBytes sets the BilledSizeBytes field's value.
+func (s *ExportDescription) SetBilledSizeBytes(v int64) *ExportDescription {
+	s.BilledSizeBytes = &v
+	return s
+}
+
+// SetClientToken sets the ClientToken field's value.
+func (s *ExportDescription) SetClientToken(v string) *ExportDescription {
+	s.ClientToken = &v
+	return s
+}
+
+// SetEndTime sets the EndTime field's value.
+func (s *ExportDescription) SetEndTime(v time.Time) *ExportDescription {
+	s.EndTime = &v
+	return s
+}
+
+// SetExportArn sets the ExportArn field's value.
+func (s *ExportDescription) SetExportArn(v string) *ExportDescription {
+	s.ExportArn = &v
+	return s
+}
+
+// SetExportFormat sets the ExportFormat field's value.
+func (s *ExportDescription) SetExportFormat(v string) *ExportDescription {
+	s.ExportFormat = &v
+	return s
+}
+
+// SetExportManifest sets the ExportManifest field's value.
+func (s *ExportDescription) SetExportManifest(v string) *ExportDescription {
+	s.ExportManifest = &v
+	return s
+}
+
+// SetExportStatus sets the ExportStatus field's value.
+func (s *ExportDescription) SetExportStatus(v string) *ExportDescription {
+	s.ExportStatus = &v
+	return s
+}
+
+// SetExportTime sets the ExportTime field's value.
+func (s *ExportDescription) SetExportTime(v time.Time) *ExportDescription {
+	s.ExportTime = &v
+	return s
+}
+
+// SetFailureCode sets the FailureCode field's value.
+func (s *ExportDescription) SetFailureCode(v string) *ExportDescription {
+	s.FailureCode = &v
+	return s
+}
+
+// SetFailureMessage sets the FailureMessage field's value.
+func (s *ExportDescription) SetFailureMessage(v string) *ExportDescription {
+	s.FailureMessage = &v
+	return s
+}
+
+// SetItemCount sets the ItemCount field's value.
+func (s *ExportDescription) SetItemCount(v int64) *ExportDescription {
+	s.ItemCount = &v
+	return s
+}
+
+// SetS3Bucket sets the S3Bucket field's value.
+func (s *ExportDescription) SetS3Bucket(v string) *ExportDescription {
+	s.S3Bucket = &v
+	return s
+}
+
+// SetS3BucketOwner sets the S3BucketOwner field's value.
+func (s *ExportDescription) SetS3BucketOwner(v string) *ExportDescription {
+	s.S3BucketOwner = &v
+	return s
+}
+
+// SetS3Prefix sets the S3Prefix field's value.
+func (s *ExportDescription) SetS3Prefix(v string) *ExportDescription {
+	s.S3Prefix = &v
+	return s
+}
+
+// SetS3SseAlgorithm sets the S3SseAlgorithm field's value.
+func (s *ExportDescription) SetS3SseAlgorithm(v string) *ExportDescription {
+	s.S3SseAlgorithm = &v
+	return s
+}
+
+// SetS3SseKmsKeyId sets the S3SseKmsKeyId field's value.
+func (s *ExportDescription) SetS3SseKmsKeyId(v string) *ExportDescription {
+	s.S3SseKmsKeyId = &v
+	return s
+}
+
+// SetStartTime sets the StartTime field's value.
+func (s *ExportDescription) SetStartTime(v time.Time) *ExportDescription {
+	s.StartTime = &v
+	return s
+}
+
+// SetTableArn sets the TableArn field's value.
+func (s *ExportDescription) SetTableArn(v string) *ExportDescription {
+	s.TableArn = &v
+	return s
+}
+
+// SetTableId sets the TableId field's value.
+func (s *ExportDescription) SetTableId(v string) *ExportDescription {
+	s.TableId = &v
+	return s
+}
+
+// The specified export was not found.
+type ExportNotFoundException struct {
+	_            struct{}                  `type:"structure"`
+	RespMetadata protocol.ResponseMetadata `json:"-" xml:"-"`
+
+	Message_ *string `locationName:"message" type:"string"`
+}
+
+// String returns the string representation
+func (s ExportNotFoundException) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ExportNotFoundException) GoString() string {
+	return s.String()
+}
+
+func newErrorExportNotFoundException(v protocol.ResponseMetadata) error {
+	return &ExportNotFoundException{
+		RespMetadata: v,
+	}
+}
+
+// Code returns the exception type name.
+func (s *ExportNotFoundException) Code() string {
+	return "ExportNotFoundException"
+}
+
+// Message returns the exception's message.
+func (s *ExportNotFoundException) Message() string {
+	if s.Message_ != nil {
+		return *s.Message_
+	}
+	return ""
+}
+
+// OrigErr always returns nil, satisfies awserr.Error interface.
+func (s *ExportNotFoundException) OrigErr() error {
+	return nil
+}
+
+func (s *ExportNotFoundException) Error() string {
+	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
+}
+
+// Status code returns the HTTP status code for the request's response error.
+func (s *ExportNotFoundException) StatusCode() int {
+	return s.RespMetadata.StatusCode
+}
+
+// RequestID returns the service's response RequestID for request.
+func (s *ExportNotFoundException) RequestID() string {
+	return s.RespMetadata.RequestID
+}
+
+// Summary information about an export task.
+type ExportSummary struct {
+	_ struct{} `type:"structure"`
+
+	// The Amazon Resource Name (ARN) of the export.
+	ExportArn *string `min:"37" type:"string"`
+
+	// Export can be in one of the following states: IN_PROGRESS, COMPLETED, or
+	// FAILED.
+	ExportStatus *string `type:"string" enum:"ExportStatus"`
+}
+
+// String returns the string representation
+func (s ExportSummary) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ExportSummary) GoString() string {
+	return s.String()
+}
+
+// SetExportArn sets the ExportArn field's value.
+func (s *ExportSummary) SetExportArn(v string) *ExportSummary {
+	s.ExportArn = &v
+	return s
+}
+
+// SetExportStatus sets the ExportStatus field's value.
+func (s *ExportSummary) SetExportStatus(v string) *ExportSummary {
+	s.ExportStatus = &v
+	return s
+}
+
+type ExportTableToPointInTimeInput struct {
+	_ struct{} `type:"structure"`
+
+	// Providing a ClientToken makes the call to ExportTableToPointInTimeInput idempotent,
+	// meaning that multiple identical calls have the same effect as one single
+	// call.
+	//
+	// A client token is valid for 8 hours after the first request that uses it
+	// is completed. After 8 hours, any request with the same client token is treated
+	// as a new request. Do not resubmit the same request with the same client token
+	// for more than 8 hours, or the result might not be idempotent.
+	//
+	// If you submit a request with the same client token but a change in other
+	// parameters within the 8-hour idempotency window, DynamoDB returns an IdempotentParameterMismatch
+	// exception.
+	ClientToken *string `type:"string" idempotencyToken:"true"`
+
+	// The format for the exported data. Valid values for ExportFormat are DYNAMODB_JSON
+	// or ION.
+	ExportFormat *string `type:"string" enum:"ExportFormat"`
+
+	// Time in the past from which to export table data. The table export will be
+	// a snapshot of the table's state at this point in time.
+	ExportTime *time.Time `type:"timestamp"`
+
+	// The name of the Amazon S3 bucket to export the snapshot to.
+	//
+	// S3Bucket is a required field
+	S3Bucket *string `type:"string" required:"true"`
+
+	// The ID of the AWS account that owns the bucket the export will be stored
+	// in.
+	S3BucketOwner *string `type:"string"`
+
+	// The Amazon S3 bucket prefix to use as the file name and path of the exported
+	// snapshot.
+	S3Prefix *string `type:"string"`
+
+	// Type of encryption used on the bucket where export data will be stored. Valid
+	// values for S3SseAlgorithm are:
+	//
+	//    * AES256 - server-side encryption with Amazon S3 managed keys
+	//
+	//    * KMS - server-side encryption with AWS KMS managed keys
+	S3SseAlgorithm *string `type:"string" enum:"S3SseAlgorithm"`
+
+	// The ID of the AWS KMS managed key used to encrypt the S3 bucket where export
+	// data will be stored (if applicable).
+	S3SseKmsKeyId *string `min:"1" type:"string"`
+
+	// The Amazon Resource Name (ARN) associated with the table to export.
+	//
+	// TableArn is a required field
+	TableArn *string `type:"string" required:"true"`
+}
+
+// String returns the string representation
+func (s ExportTableToPointInTimeInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ExportTableToPointInTimeInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ExportTableToPointInTimeInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ExportTableToPointInTimeInput"}
+	if s.S3Bucket == nil {
+		invalidParams.Add(request.NewErrParamRequired("S3Bucket"))
+	}
+	if s.S3SseKmsKeyId != nil && len(*s.S3SseKmsKeyId) < 1 {
+		invalidParams.Add(request.NewErrParamMinLen("S3SseKmsKeyId", 1))
+	}
+	if s.TableArn == nil {
+		invalidParams.Add(request.NewErrParamRequired("TableArn"))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetClientToken sets the ClientToken field's value.
+func (s *ExportTableToPointInTimeInput) SetClientToken(v string) *ExportTableToPointInTimeInput {
+	s.ClientToken = &v
+	return s
+}
+
+// SetExportFormat sets the ExportFormat field's value.
+func (s *ExportTableToPointInTimeInput) SetExportFormat(v string) *ExportTableToPointInTimeInput {
+	s.ExportFormat = &v
+	return s
+}
+
+// SetExportTime sets the ExportTime field's value.
+func (s *ExportTableToPointInTimeInput) SetExportTime(v time.Time) *ExportTableToPointInTimeInput {
+	s.ExportTime = &v
+	return s
+}
+
+// SetS3Bucket sets the S3Bucket field's value.
+func (s *ExportTableToPointInTimeInput) SetS3Bucket(v string) *ExportTableToPointInTimeInput {
+	s.S3Bucket = &v
+	return s
+}
+
+// SetS3BucketOwner sets the S3BucketOwner field's value.
+func (s *ExportTableToPointInTimeInput) SetS3BucketOwner(v string) *ExportTableToPointInTimeInput {
+	s.S3BucketOwner = &v
+	return s
+}
+
+// SetS3Prefix sets the S3Prefix field's value.
+func (s *ExportTableToPointInTimeInput) SetS3Prefix(v string) *ExportTableToPointInTimeInput {
+	s.S3Prefix = &v
+	return s
+}
+
+// SetS3SseAlgorithm sets the S3SseAlgorithm field's value.
+func (s *ExportTableToPointInTimeInput) SetS3SseAlgorithm(v string) *ExportTableToPointInTimeInput {
+	s.S3SseAlgorithm = &v
+	return s
+}
+
+// SetS3SseKmsKeyId sets the S3SseKmsKeyId field's value.
+func (s *ExportTableToPointInTimeInput) SetS3SseKmsKeyId(v string) *ExportTableToPointInTimeInput {
+	s.S3SseKmsKeyId = &v
+	return s
+}
+
+// SetTableArn sets the TableArn field's value.
+func (s *ExportTableToPointInTimeInput) SetTableArn(v string) *ExportTableToPointInTimeInput {
+	s.TableArn = &v
+	return s
+}
+
+type ExportTableToPointInTimeOutput struct {
+	_ struct{} `type:"structure"`
+
+	// Contains a description of the table export.
+	ExportDescription *ExportDescription `type:"structure"`
+}
+
+// String returns the string representation
+func (s ExportTableToPointInTimeOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ExportTableToPointInTimeOutput) GoString() string {
+	return s.String()
+}
+
+// SetExportDescription sets the ExportDescription field's value.
+func (s *ExportTableToPointInTimeOutput) SetExportDescription(v *ExportDescription) *ExportTableToPointInTimeOutput {
+	s.ExportDescription = v
+	return s
+}
+
 // Represents a failure a contributor insights operation.
 type FailureException struct {
 	_ struct{} `type:"structure"`
@@ -10804,8 +11744,8 @@ type GlobalSecondaryIndex struct {
 	// Represents the provisioned throughput settings for the specified global secondary
 	// index.
 	//
-	// For current minimum and maximum provisioned throughput values, see Limits
-	// (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
+	// For current minimum and maximum provisioned throughput values, see Service,
+	// Account, and Table Quotas (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 	// in the Amazon DynamoDB Developer Guide.
 	ProvisionedThroughput *ProvisionedThroughput `type:"structure"`
 }
@@ -11013,8 +11953,8 @@ type GlobalSecondaryIndexDescription struct {
 	// Represents the provisioned throughput settings for the specified global secondary
 	// index.
 	//
-	// For current minimum and maximum provisioned throughput values, see Limits
-	// (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
+	// For current minimum and maximum provisioned throughput values, see Service,
+	// Account, and Table Quotas (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 	// in the Amazon DynamoDB Developer Guide.
 	ProvisionedThroughput *ProvisionedThroughputDescription `type:"structure"`
 }
@@ -11296,12 +12236,12 @@ func newErrorGlobalTableAlreadyExistsException(v protocol.ResponseMetadata) erro
 }
 
 // Code returns the exception type name.
-func (s GlobalTableAlreadyExistsException) Code() string {
+func (s *GlobalTableAlreadyExistsException) Code() string {
 	return "GlobalTableAlreadyExistsException"
 }
 
 // Message returns the exception's message.
-func (s GlobalTableAlreadyExistsException) Message() string {
+func (s *GlobalTableAlreadyExistsException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -11309,21 +12249,21 @@ func (s GlobalTableAlreadyExistsException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s GlobalTableAlreadyExistsException) OrigErr() error {
+func (s *GlobalTableAlreadyExistsException) OrigErr() error {
 	return nil
 }
 
-func (s GlobalTableAlreadyExistsException) Error() string {
+func (s *GlobalTableAlreadyExistsException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s GlobalTableAlreadyExistsException) StatusCode() int {
+func (s *GlobalTableAlreadyExistsException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s GlobalTableAlreadyExistsException) RequestID() string {
+func (s *GlobalTableAlreadyExistsException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -11492,12 +12432,12 @@ func newErrorGlobalTableNotFoundException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s GlobalTableNotFoundException) Code() string {
+func (s *GlobalTableNotFoundException) Code() string {
 	return "GlobalTableNotFoundException"
 }
 
 // Message returns the exception's message.
-func (s GlobalTableNotFoundException) Message() string {
+func (s *GlobalTableNotFoundException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -11505,21 +12445,21 @@ func (s GlobalTableNotFoundException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s GlobalTableNotFoundException) OrigErr() error {
+func (s *GlobalTableNotFoundException) OrigErr() error {
 	return nil
 }
 
-func (s GlobalTableNotFoundException) Error() string {
+func (s *GlobalTableNotFoundException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s GlobalTableNotFoundException) StatusCode() int {
+func (s *GlobalTableNotFoundException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s GlobalTableNotFoundException) RequestID() string {
+func (s *GlobalTableNotFoundException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -11549,12 +12489,12 @@ func newErrorIdempotentParameterMismatchException(v protocol.ResponseMetadata) e
 }
 
 // Code returns the exception type name.
-func (s IdempotentParameterMismatchException) Code() string {
+func (s *IdempotentParameterMismatchException) Code() string {
 	return "IdempotentParameterMismatchException"
 }
 
 // Message returns the exception's message.
-func (s IdempotentParameterMismatchException) Message() string {
+func (s *IdempotentParameterMismatchException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -11562,21 +12502,21 @@ func (s IdempotentParameterMismatchException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s IdempotentParameterMismatchException) OrigErr() error {
+func (s *IdempotentParameterMismatchException) OrigErr() error {
 	return nil
 }
 
-func (s IdempotentParameterMismatchException) Error() string {
+func (s *IdempotentParameterMismatchException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s IdempotentParameterMismatchException) StatusCode() int {
+func (s *IdempotentParameterMismatchException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s IdempotentParameterMismatchException) RequestID() string {
+func (s *IdempotentParameterMismatchException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -11605,12 +12545,12 @@ func newErrorIndexNotFoundException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s IndexNotFoundException) Code() string {
+func (s *IndexNotFoundException) Code() string {
 	return "IndexNotFoundException"
 }
 
 // Message returns the exception's message.
-func (s IndexNotFoundException) Message() string {
+func (s *IndexNotFoundException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -11618,21 +12558,21 @@ func (s IndexNotFoundException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s IndexNotFoundException) OrigErr() error {
+func (s *IndexNotFoundException) OrigErr() error {
 	return nil
 }
 
-func (s IndexNotFoundException) Error() string {
+func (s *IndexNotFoundException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s IndexNotFoundException) StatusCode() int {
+func (s *IndexNotFoundException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s IndexNotFoundException) RequestID() string {
+func (s *IndexNotFoundException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -11662,12 +12602,12 @@ func newErrorInternalServerError(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s InternalServerError) Code() string {
+func (s *InternalServerError) Code() string {
 	return "InternalServerError"
 }
 
 // Message returns the exception's message.
-func (s InternalServerError) Message() string {
+func (s *InternalServerError) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -11675,21 +12615,77 @@ func (s InternalServerError) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s InternalServerError) OrigErr() error {
+func (s *InternalServerError) OrigErr() error {
 	return nil
 }
 
-func (s InternalServerError) Error() string {
+func (s *InternalServerError) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s InternalServerError) StatusCode() int {
+func (s *InternalServerError) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s InternalServerError) RequestID() string {
+func (s *InternalServerError) RequestID() string {
+	return s.RespMetadata.RequestID
+}
+
+// The specified ExportTime is outside of the point in time recovery window.
+type InvalidExportTimeException struct {
+	_            struct{}                  `type:"structure"`
+	RespMetadata protocol.ResponseMetadata `json:"-" xml:"-"`
+
+	Message_ *string `locationName:"message" type:"string"`
+}
+
+// String returns the string representation
+func (s InvalidExportTimeException) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s InvalidExportTimeException) GoString() string {
+	return s.String()
+}
+
+func newErrorInvalidExportTimeException(v protocol.ResponseMetadata) error {
+	return &InvalidExportTimeException{
+		RespMetadata: v,
+	}
+}
+
+// Code returns the exception type name.
+func (s *InvalidExportTimeException) Code() string {
+	return "InvalidExportTimeException"
+}
+
+// Message returns the exception's message.
+func (s *InvalidExportTimeException) Message() string {
+	if s.Message_ != nil {
+		return *s.Message_
+	}
+	return ""
+}
+
+// OrigErr always returns nil, satisfies awserr.Error interface.
+func (s *InvalidExportTimeException) OrigErr() error {
+	return nil
+}
+
+func (s *InvalidExportTimeException) Error() string {
+	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
+}
+
+// Status code returns the HTTP status code for the request's response error.
+func (s *InvalidExportTimeException) StatusCode() int {
+	return s.RespMetadata.StatusCode
+}
+
+// RequestID returns the service's response RequestID for request.
+func (s *InvalidExportTimeException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -11719,12 +12715,12 @@ func newErrorInvalidRestoreTimeException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s InvalidRestoreTimeException) Code() string {
+func (s *InvalidRestoreTimeException) Code() string {
 	return "InvalidRestoreTimeException"
 }
 
 // Message returns the exception's message.
-func (s InvalidRestoreTimeException) Message() string {
+func (s *InvalidRestoreTimeException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -11732,21 +12728,21 @@ func (s InvalidRestoreTimeException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s InvalidRestoreTimeException) OrigErr() error {
+func (s *InvalidRestoreTimeException) OrigErr() error {
 	return nil
 }
 
-func (s InvalidRestoreTimeException) Error() string {
+func (s *InvalidRestoreTimeException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s InvalidRestoreTimeException) StatusCode() int {
+func (s *InvalidRestoreTimeException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s InvalidRestoreTimeException) RequestID() string {
+func (s *InvalidRestoreTimeException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -11823,12 +12819,12 @@ func newErrorItemCollectionSizeLimitExceededException(v protocol.ResponseMetadat
 }
 
 // Code returns the exception type name.
-func (s ItemCollectionSizeLimitExceededException) Code() string {
+func (s *ItemCollectionSizeLimitExceededException) Code() string {
 	return "ItemCollectionSizeLimitExceededException"
 }
 
 // Message returns the exception's message.
-func (s ItemCollectionSizeLimitExceededException) Message() string {
+func (s *ItemCollectionSizeLimitExceededException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -11836,21 +12832,21 @@ func (s ItemCollectionSizeLimitExceededException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s ItemCollectionSizeLimitExceededException) OrigErr() error {
+func (s *ItemCollectionSizeLimitExceededException) OrigErr() error {
 	return nil
 }
 
-func (s ItemCollectionSizeLimitExceededException) Error() string {
+func (s *ItemCollectionSizeLimitExceededException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s ItemCollectionSizeLimitExceededException) StatusCode() int {
+func (s *ItemCollectionSizeLimitExceededException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s ItemCollectionSizeLimitExceededException) RequestID() string {
+func (s *ItemCollectionSizeLimitExceededException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -12102,7 +13098,7 @@ func (s *KeysAndAttributes) SetProjectionExpression(v string) *KeysAndAttributes
 // if the table or index specifications are complex, DynamoDB might temporarily
 // reduce the number of concurrent operations.
 //
-// There is a soft account limit of 256 tables.
+// There is a soft account quota of 256 tables.
 type LimitExceededException struct {
 	_            struct{}                  `type:"structure"`
 	RespMetadata protocol.ResponseMetadata `json:"-" xml:"-"`
@@ -12128,12 +13124,12 @@ func newErrorLimitExceededException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s LimitExceededException) Code() string {
+func (s *LimitExceededException) Code() string {
 	return "LimitExceededException"
 }
 
 // Message returns the exception's message.
-func (s LimitExceededException) Message() string {
+func (s *LimitExceededException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -12141,21 +13137,21 @@ func (s LimitExceededException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s LimitExceededException) OrigErr() error {
+func (s *LimitExceededException) OrigErr() error {
 	return nil
 }
 
-func (s LimitExceededException) Error() string {
+func (s *LimitExceededException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s LimitExceededException) StatusCode() int {
+func (s *LimitExceededException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s LimitExceededException) RequestID() string {
+func (s *LimitExceededException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -12382,6 +13378,95 @@ func (s *ListContributorInsightsOutput) SetContributorInsightsSummaries(v []*Con
 
 // SetNextToken sets the NextToken field's value.
 func (s *ListContributorInsightsOutput) SetNextToken(v string) *ListContributorInsightsOutput {
+	s.NextToken = &v
+	return s
+}
+
+type ListExportsInput struct {
+	_ struct{} `type:"structure"`
+
+	// Maximum number of results to return per page.
+	MaxResults *int64 `min:"1" type:"integer"`
+
+	// An optional string that, if supplied, must be copied from the output of a
+	// previous call to ListExports. When provided in this manner, the API fetches
+	// the next page of results.
+	NextToken *string `type:"string"`
+
+	// The Amazon Resource Name (ARN) associated with the exported table.
+	TableArn *string `type:"string"`
+}
+
+// String returns the string representation
+func (s ListExportsInput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ListExportsInput) GoString() string {
+	return s.String()
+}
+
+// Validate inspects the fields of the type to determine if they are valid.
+func (s *ListExportsInput) Validate() error {
+	invalidParams := request.ErrInvalidParams{Context: "ListExportsInput"}
+	if s.MaxResults != nil && *s.MaxResults < 1 {
+		invalidParams.Add(request.NewErrParamMinValue("MaxResults", 1))
+	}
+
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	}
+	return nil
+}
+
+// SetMaxResults sets the MaxResults field's value.
+func (s *ListExportsInput) SetMaxResults(v int64) *ListExportsInput {
+	s.MaxResults = &v
+	return s
+}
+
+// SetNextToken sets the NextToken field's value.
+func (s *ListExportsInput) SetNextToken(v string) *ListExportsInput {
+	s.NextToken = &v
+	return s
+}
+
+// SetTableArn sets the TableArn field's value.
+func (s *ListExportsInput) SetTableArn(v string) *ListExportsInput {
+	s.TableArn = &v
+	return s
+}
+
+type ListExportsOutput struct {
+	_ struct{} `type:"structure"`
+
+	// A list of ExportSummary objects.
+	ExportSummaries []*ExportSummary `type:"list"`
+
+	// If this value is returned, there are additional results to be displayed.
+	// To retrieve them, call ListExports again, with NextToken set to this value.
+	NextToken *string `type:"string"`
+}
+
+// String returns the string representation
+func (s ListExportsOutput) String() string {
+	return awsutil.Prettify(s)
+}
+
+// GoString returns the string representation
+func (s ListExportsOutput) GoString() string {
+	return s.String()
+}
+
+// SetExportSummaries sets the ExportSummaries field's value.
+func (s *ListExportsOutput) SetExportSummaries(v []*ExportSummary) *ListExportsOutput {
+	s.ExportSummaries = v
+	return s
+}
+
+// SetNextToken sets the NextToken field's value.
+func (s *ListExportsOutput) SetNextToken(v string) *ListExportsOutput {
 	s.NextToken = &v
 	return s
 }
@@ -13029,12 +14114,12 @@ func newErrorPointInTimeRecoveryUnavailableException(v protocol.ResponseMetadata
 }
 
 // Code returns the exception type name.
-func (s PointInTimeRecoveryUnavailableException) Code() string {
+func (s *PointInTimeRecoveryUnavailableException) Code() string {
 	return "PointInTimeRecoveryUnavailableException"
 }
 
 // Message returns the exception's message.
-func (s PointInTimeRecoveryUnavailableException) Message() string {
+func (s *PointInTimeRecoveryUnavailableException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -13042,21 +14127,21 @@ func (s PointInTimeRecoveryUnavailableException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s PointInTimeRecoveryUnavailableException) OrigErr() error {
+func (s *PointInTimeRecoveryUnavailableException) OrigErr() error {
 	return nil
 }
 
-func (s PointInTimeRecoveryUnavailableException) Error() string {
+func (s *PointInTimeRecoveryUnavailableException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s PointInTimeRecoveryUnavailableException) StatusCode() int {
+func (s *PointInTimeRecoveryUnavailableException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s PointInTimeRecoveryUnavailableException) RequestID() string {
+func (s *PointInTimeRecoveryUnavailableException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -13078,8 +14163,8 @@ type Projection struct {
 	//
 	//    * KEYS_ONLY - Only the index and primary keys are projected into the index.
 	//
-	//    * INCLUDE - Only the specified table attributes are projected into the
-	//    index. The list of projected attributes is in NonKeyAttributes.
+	//    * INCLUDE - In addition to the attributes described in KEYS_ONLY, the
+	//    secondary index will include other non-key attributes that you specify.
 	//
 	//    * ALL - All of the table attributes are projected into the index.
 	ProjectionType *string `type:"string" enum:"ProjectionType"`
@@ -13123,8 +14208,8 @@ func (s *Projection) SetProjectionType(v string) *Projection {
 // Represents the provisioned throughput settings for a specified table or index.
 // The settings can be modified using the UpdateTable operation.
 //
-// For current minimum and maximum provisioned throughput values, see Limits
-// (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
+// For current minimum and maximum provisioned throughput values, see Service,
+// Account, and Table Quotas (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 // in the Amazon DynamoDB Developer Guide.
 type ProvisionedThroughput struct {
 	_ struct{} `type:"structure"`
@@ -13207,7 +14292,7 @@ type ProvisionedThroughputDescription struct {
 
 	// The number of provisioned throughput decreases for this table during this
 	// UTC calendar day. For current maximums on provisioned throughput decreases,
-	// see Limits (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
+	// see Service, Account, and Table Quotas (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 	// in the Amazon DynamoDB Developer Guide.
 	NumberOfDecreasesToday *int64 `min:"1" type:"long"`
 
@@ -13293,12 +14378,12 @@ func newErrorProvisionedThroughputExceededException(v protocol.ResponseMetadata)
 }
 
 // Code returns the exception type name.
-func (s ProvisionedThroughputExceededException) Code() string {
+func (s *ProvisionedThroughputExceededException) Code() string {
 	return "ProvisionedThroughputExceededException"
 }
 
 // Message returns the exception's message.
-func (s ProvisionedThroughputExceededException) Message() string {
+func (s *ProvisionedThroughputExceededException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -13306,21 +14391,21 @@ func (s ProvisionedThroughputExceededException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s ProvisionedThroughputExceededException) OrigErr() error {
+func (s *ProvisionedThroughputExceededException) OrigErr() error {
 	return nil
 }
 
-func (s ProvisionedThroughputExceededException) Error() string {
+func (s *ProvisionedThroughputExceededException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s ProvisionedThroughputExceededException) StatusCode() int {
+func (s *ProvisionedThroughputExceededException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s ProvisionedThroughputExceededException) RequestID() string {
+func (s *ProvisionedThroughputExceededException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -13563,6 +14648,10 @@ type PutItemInput struct {
 	// If you specify any attributes that are part of an index key, then the data
 	// types for those attributes must match those of the schema in the table's
 	// attribute definition.
+	//
+	// Empty String and Binary attribute values are allowed. Attribute values of
+	// type String and Binary must have a length greater than zero if the attribute
+	// is used as a key attribute for a table or index.
 	//
 	// For more information about primary keys, see Primary Key (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.CoreComponents.html#HowItWorks.CoreComponents.PrimaryKey)
 	// in the Amazon DynamoDB Developer Guide.
@@ -14383,12 +15472,12 @@ func newErrorReplicaAlreadyExistsException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s ReplicaAlreadyExistsException) Code() string {
+func (s *ReplicaAlreadyExistsException) Code() string {
 	return "ReplicaAlreadyExistsException"
 }
 
 // Message returns the exception's message.
-func (s ReplicaAlreadyExistsException) Message() string {
+func (s *ReplicaAlreadyExistsException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -14396,21 +15485,21 @@ func (s ReplicaAlreadyExistsException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s ReplicaAlreadyExistsException) OrigErr() error {
+func (s *ReplicaAlreadyExistsException) OrigErr() error {
 	return nil
 }
 
-func (s ReplicaAlreadyExistsException) Error() string {
+func (s *ReplicaAlreadyExistsException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s ReplicaAlreadyExistsException) StatusCode() int {
+func (s *ReplicaAlreadyExistsException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s ReplicaAlreadyExistsException) RequestID() string {
+func (s *ReplicaAlreadyExistsException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -14576,6 +15665,10 @@ type ReplicaDescription struct {
 	// The name of the Region.
 	RegionName *string `type:"string"`
 
+	// The time at which the replica was first detected as inaccessible. To determine
+	// cause of inaccessibility check the ReplicaStatus property.
+	ReplicaInaccessibleDateTime *time.Time `type:"timestamp"`
+
 	// The current state of the replica:
 	//
 	//    * CREATING - The replica is being created.
@@ -14585,6 +15678,18 @@ type ReplicaDescription struct {
 	//    * DELETING - The replica is being deleted.
 	//
 	//    * ACTIVE - The replica is ready for use.
+	//
+	//    * REGION_DISABLED - The replica is inaccessible because the AWS Region
+	//    has been disabled. If the AWS Region remains inaccessible for more than
+	//    20 hours, DynamoDB will remove this replica from the replication group.
+	//    The replica will not be deleted and replication will stop from and to
+	//    this region.
+	//
+	//    * INACCESSIBLE_ENCRYPTION_CREDENTIALS - The AWS KMS key used to encrypt
+	//    the table is inaccessible. If the AWS KMS key remains inaccessible for
+	//    more than 20 hours, DynamoDB will remove this replica from the replication
+	//    group. The replica will not be deleted and replication will stop from
+	//    and to this region.
 	ReplicaStatus *string `type:"string" enum:"ReplicaStatus"`
 
 	// Detailed information about the replica status.
@@ -14626,6 +15731,12 @@ func (s *ReplicaDescription) SetProvisionedThroughputOverride(v *ProvisionedThro
 // SetRegionName sets the RegionName field's value.
 func (s *ReplicaDescription) SetRegionName(v string) *ReplicaDescription {
 	s.RegionName = &v
+	return s
+}
+
+// SetReplicaInaccessibleDateTime sets the ReplicaInaccessibleDateTime field's value.
+func (s *ReplicaDescription) SetReplicaInaccessibleDateTime(v time.Time) *ReplicaDescription {
+	s.ReplicaInaccessibleDateTime = &v
 	return s
 }
 
@@ -15033,12 +16144,12 @@ func newErrorReplicaNotFoundException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s ReplicaNotFoundException) Code() string {
+func (s *ReplicaNotFoundException) Code() string {
 	return "ReplicaNotFoundException"
 }
 
 // Message returns the exception's message.
-func (s ReplicaNotFoundException) Message() string {
+func (s *ReplicaNotFoundException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -15046,21 +16157,21 @@ func (s ReplicaNotFoundException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s ReplicaNotFoundException) OrigErr() error {
+func (s *ReplicaNotFoundException) OrigErr() error {
 	return nil
 }
 
-func (s ReplicaNotFoundException) Error() string {
+func (s *ReplicaNotFoundException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s ReplicaNotFoundException) StatusCode() int {
+func (s *ReplicaNotFoundException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s ReplicaNotFoundException) RequestID() string {
+func (s *ReplicaNotFoundException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -15396,9 +16507,9 @@ func (s *ReplicationGroupUpdate) SetUpdate(v *UpdateReplicationGroupMemberAction
 	return s
 }
 
-// Throughput exceeds the current throughput limit for your account. Please
+// Throughput exceeds the current throughput quota for your account. Please
 // contact AWS Support at AWS Support (https://aws.amazon.com/support) to request
-// a limit increase.
+// a quota increase.
 type RequestLimitExceeded struct {
 	_            struct{}                  `type:"structure"`
 	RespMetadata protocol.ResponseMetadata `json:"-" xml:"-"`
@@ -15423,12 +16534,12 @@ func newErrorRequestLimitExceeded(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s RequestLimitExceeded) Code() string {
+func (s *RequestLimitExceeded) Code() string {
 	return "RequestLimitExceeded"
 }
 
 // Message returns the exception's message.
-func (s RequestLimitExceeded) Message() string {
+func (s *RequestLimitExceeded) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -15436,21 +16547,21 @@ func (s RequestLimitExceeded) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s RequestLimitExceeded) OrigErr() error {
+func (s *RequestLimitExceeded) OrigErr() error {
 	return nil
 }
 
-func (s RequestLimitExceeded) Error() string {
+func (s *RequestLimitExceeded) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s RequestLimitExceeded) StatusCode() int {
+func (s *RequestLimitExceeded) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s RequestLimitExceeded) RequestID() string {
+func (s *RequestLimitExceeded) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -15482,12 +16593,12 @@ func newErrorResourceInUseException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s ResourceInUseException) Code() string {
+func (s *ResourceInUseException) Code() string {
 	return "ResourceInUseException"
 }
 
 // Message returns the exception's message.
-func (s ResourceInUseException) Message() string {
+func (s *ResourceInUseException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -15495,21 +16606,21 @@ func (s ResourceInUseException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s ResourceInUseException) OrigErr() error {
+func (s *ResourceInUseException) OrigErr() error {
 	return nil
 }
 
-func (s ResourceInUseException) Error() string {
+func (s *ResourceInUseException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s ResourceInUseException) StatusCode() int {
+func (s *ResourceInUseException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s ResourceInUseException) RequestID() string {
+func (s *ResourceInUseException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -15540,12 +16651,12 @@ func newErrorResourceNotFoundException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s ResourceNotFoundException) Code() string {
+func (s *ResourceNotFoundException) Code() string {
 	return "ResourceNotFoundException"
 }
 
 // Message returns the exception's message.
-func (s ResourceNotFoundException) Message() string {
+func (s *ResourceNotFoundException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -15553,21 +16664,21 @@ func (s ResourceNotFoundException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s ResourceNotFoundException) OrigErr() error {
+func (s *ResourceNotFoundException) OrigErr() error {
 	return nil
 }
 
-func (s ResourceNotFoundException) Error() string {
+func (s *ResourceNotFoundException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s ResourceNotFoundException) StatusCode() int {
+func (s *ResourceNotFoundException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s ResourceNotFoundException) RequestID() string {
+func (s *ResourceNotFoundException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -16815,12 +17926,12 @@ func newErrorTableAlreadyExistsException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s TableAlreadyExistsException) Code() string {
+func (s *TableAlreadyExistsException) Code() string {
 	return "TableAlreadyExistsException"
 }
 
 // Message returns the exception's message.
-func (s TableAlreadyExistsException) Message() string {
+func (s *TableAlreadyExistsException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -16828,21 +17939,21 @@ func (s TableAlreadyExistsException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s TableAlreadyExistsException) OrigErr() error {
+func (s *TableAlreadyExistsException) OrigErr() error {
 	return nil
 }
 
-func (s TableAlreadyExistsException) Error() string {
+func (s *TableAlreadyExistsException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s TableAlreadyExistsException) StatusCode() int {
+func (s *TableAlreadyExistsException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s TableAlreadyExistsException) RequestID() string {
+func (s *TableAlreadyExistsException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -16957,14 +18068,14 @@ type TableDescription struct {
 	//    and index key attributes, which are automatically projected. Each attribute
 	//    specification is composed of: ProjectionType - One of the following: KEYS_ONLY
 	//    - Only the index and primary keys are projected into the index. INCLUDE
-	//    - Only the specified table attributes are projected into the index. The
-	//    list of projected attributes is in NonKeyAttributes. ALL - All of the
-	//    table attributes are projected into the index. NonKeyAttributes - A list
-	//    of one or more non-key attribute names that are projected into the secondary
-	//    index. The total count of attributes provided in NonKeyAttributes, summed
-	//    across all of the secondary indexes, must not exceed 20. If you project
-	//    the same attribute into two different indexes, this counts as two distinct
-	//    attributes when determining the total.
+	//    - In addition to the attributes described in KEYS_ONLY, the secondary
+	//    index will include other non-key attributes that you specify. ALL - All
+	//    of the table attributes are projected into the index. NonKeyAttributes
+	//    - A list of one or more non-key attribute names that are projected into
+	//    the secondary index. The total count of attributes provided in NonKeyAttributes,
+	//    summed across all of the secondary indexes, must not exceed 20. If you
+	//    project the same attribute into two different indexes, this counts as
+	//    two distinct attributes when determining the total.
 	//
 	//    * ProvisionedThroughput - The provisioned throughput settings for the
 	//    global secondary index, consisting of read and write capacity units, along
@@ -17269,12 +18380,12 @@ func newErrorTableInUseException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s TableInUseException) Code() string {
+func (s *TableInUseException) Code() string {
 	return "TableInUseException"
 }
 
 // Message returns the exception's message.
-func (s TableInUseException) Message() string {
+func (s *TableInUseException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -17282,21 +18393,21 @@ func (s TableInUseException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s TableInUseException) OrigErr() error {
+func (s *TableInUseException) OrigErr() error {
 	return nil
 }
 
-func (s TableInUseException) Error() string {
+func (s *TableInUseException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s TableInUseException) StatusCode() int {
+func (s *TableInUseException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s TableInUseException) RequestID() string {
+func (s *TableInUseException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -17326,12 +18437,12 @@ func newErrorTableNotFoundException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s TableNotFoundException) Code() string {
+func (s *TableNotFoundException) Code() string {
 	return "TableNotFoundException"
 }
 
 // Message returns the exception's message.
-func (s TableNotFoundException) Message() string {
+func (s *TableNotFoundException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -17339,21 +18450,21 @@ func (s TableNotFoundException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s TableNotFoundException) OrigErr() error {
+func (s *TableNotFoundException) OrigErr() error {
 	return nil
 }
 
-func (s TableNotFoundException) Error() string {
+func (s *TableNotFoundException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s TableNotFoundException) StatusCode() int {
+func (s *TableNotFoundException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s TableNotFoundException) RequestID() string {
+func (s *TableNotFoundException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -18096,12 +19207,12 @@ func newErrorTransactionCanceledException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s TransactionCanceledException) Code() string {
+func (s *TransactionCanceledException) Code() string {
 	return "TransactionCanceledException"
 }
 
 // Message returns the exception's message.
-func (s TransactionCanceledException) Message() string {
+func (s *TransactionCanceledException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -18109,21 +19220,21 @@ func (s TransactionCanceledException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s TransactionCanceledException) OrigErr() error {
+func (s *TransactionCanceledException) OrigErr() error {
 	return nil
 }
 
-func (s TransactionCanceledException) Error() string {
+func (s *TransactionCanceledException) Error() string {
 	return fmt.Sprintf("%s: %s\n%s", s.Code(), s.Message(), s.String())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s TransactionCanceledException) StatusCode() int {
+func (s *TransactionCanceledException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s TransactionCanceledException) RequestID() string {
+func (s *TransactionCanceledException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -18152,12 +19263,12 @@ func newErrorTransactionConflictException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s TransactionConflictException) Code() string {
+func (s *TransactionConflictException) Code() string {
 	return "TransactionConflictException"
 }
 
 // Message returns the exception's message.
-func (s TransactionConflictException) Message() string {
+func (s *TransactionConflictException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -18165,21 +19276,21 @@ func (s TransactionConflictException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s TransactionConflictException) OrigErr() error {
+func (s *TransactionConflictException) OrigErr() error {
 	return nil
 }
 
-func (s TransactionConflictException) Error() string {
+func (s *TransactionConflictException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s TransactionConflictException) StatusCode() int {
+func (s *TransactionConflictException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s TransactionConflictException) RequestID() string {
+func (s *TransactionConflictException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -18208,12 +19319,12 @@ func newErrorTransactionInProgressException(v protocol.ResponseMetadata) error {
 }
 
 // Code returns the exception type name.
-func (s TransactionInProgressException) Code() string {
+func (s *TransactionInProgressException) Code() string {
 	return "TransactionInProgressException"
 }
 
 // Message returns the exception's message.
-func (s TransactionInProgressException) Message() string {
+func (s *TransactionInProgressException) Message() string {
 	if s.Message_ != nil {
 		return *s.Message_
 	}
@@ -18221,21 +19332,21 @@ func (s TransactionInProgressException) Message() string {
 }
 
 // OrigErr always returns nil, satisfies awserr.Error interface.
-func (s TransactionInProgressException) OrigErr() error {
+func (s *TransactionInProgressException) OrigErr() error {
 	return nil
 }
 
-func (s TransactionInProgressException) Error() string {
+func (s *TransactionInProgressException) Error() string {
 	return fmt.Sprintf("%s: %s", s.Code(), s.Message())
 }
 
 // Status code returns the HTTP status code for the request's response error.
-func (s TransactionInProgressException) StatusCode() int {
+func (s *TransactionInProgressException) StatusCode() int {
 	return s.RespMetadata.StatusCode
 }
 
 // RequestID returns the service's response RequestID for request.
-func (s TransactionInProgressException) RequestID() string {
+func (s *TransactionInProgressException) RequestID() string {
 	return s.RespMetadata.RequestID
 }
 
@@ -18625,8 +19736,8 @@ type UpdateGlobalSecondaryIndexAction struct {
 	// Represents the provisioned throughput settings for the specified global secondary
 	// index.
 	//
-	// For current minimum and maximum provisioned throughput values, see Limits
-	// (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
+	// For current minimum and maximum provisioned throughput values, see Service,
+	// Account, and Table Quotas (https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Limits.html)
 	// in the Amazon DynamoDB Developer Guide.
 	//
 	// ProvisionedThroughput is a required field
@@ -19865,6 +20976,15 @@ const (
 	AttributeActionDelete = "DELETE"
 )
 
+// AttributeAction_Values returns all elements of the AttributeAction enum
+func AttributeAction_Values() []string {
+	return []string{
+		AttributeActionAdd,
+		AttributeActionPut,
+		AttributeActionDelete,
+	}
+}
+
 const (
 	// BackupStatusCreating is a BackupStatus enum value
 	BackupStatusCreating = "CREATING"
@@ -19876,6 +20996,15 @@ const (
 	BackupStatusAvailable = "AVAILABLE"
 )
 
+// BackupStatus_Values returns all elements of the BackupStatus enum
+func BackupStatus_Values() []string {
+	return []string{
+		BackupStatusCreating,
+		BackupStatusDeleted,
+		BackupStatusAvailable,
+	}
+}
+
 const (
 	// BackupTypeUser is a BackupType enum value
 	BackupTypeUser = "USER"
@@ -19886,6 +21015,15 @@ const (
 	// BackupTypeAwsBackup is a BackupType enum value
 	BackupTypeAwsBackup = "AWS_BACKUP"
 )
+
+// BackupType_Values returns all elements of the BackupType enum
+func BackupType_Values() []string {
+	return []string{
+		BackupTypeUser,
+		BackupTypeSystem,
+		BackupTypeAwsBackup,
+	}
+}
 
 const (
 	// BackupTypeFilterUser is a BackupTypeFilter enum value
@@ -19901,6 +21039,16 @@ const (
 	BackupTypeFilterAll = "ALL"
 )
 
+// BackupTypeFilter_Values returns all elements of the BackupTypeFilter enum
+func BackupTypeFilter_Values() []string {
+	return []string{
+		BackupTypeFilterUser,
+		BackupTypeFilterSystem,
+		BackupTypeFilterAwsBackup,
+		BackupTypeFilterAll,
+	}
+}
+
 const (
 	// BillingModeProvisioned is a BillingMode enum value
 	BillingModeProvisioned = "PROVISIONED"
@@ -19908,6 +21056,14 @@ const (
 	// BillingModePayPerRequest is a BillingMode enum value
 	BillingModePayPerRequest = "PAY_PER_REQUEST"
 )
+
+// BillingMode_Values returns all elements of the BillingMode enum
+func BillingMode_Values() []string {
+	return []string{
+		BillingModeProvisioned,
+		BillingModePayPerRequest,
+	}
+}
 
 const (
 	// ComparisonOperatorEq is a ComparisonOperator enum value
@@ -19950,6 +21106,25 @@ const (
 	ComparisonOperatorBeginsWith = "BEGINS_WITH"
 )
 
+// ComparisonOperator_Values returns all elements of the ComparisonOperator enum
+func ComparisonOperator_Values() []string {
+	return []string{
+		ComparisonOperatorEq,
+		ComparisonOperatorNe,
+		ComparisonOperatorIn,
+		ComparisonOperatorLe,
+		ComparisonOperatorLt,
+		ComparisonOperatorGe,
+		ComparisonOperatorGt,
+		ComparisonOperatorBetween,
+		ComparisonOperatorNotNull,
+		ComparisonOperatorNull,
+		ComparisonOperatorContains,
+		ComparisonOperatorNotContains,
+		ComparisonOperatorBeginsWith,
+	}
+}
+
 const (
 	// ConditionalOperatorAnd is a ConditionalOperator enum value
 	ConditionalOperatorAnd = "AND"
@@ -19957,6 +21132,14 @@ const (
 	// ConditionalOperatorOr is a ConditionalOperator enum value
 	ConditionalOperatorOr = "OR"
 )
+
+// ConditionalOperator_Values returns all elements of the ConditionalOperator enum
+func ConditionalOperator_Values() []string {
+	return []string{
+		ConditionalOperatorAnd,
+		ConditionalOperatorOr,
+	}
+}
 
 const (
 	// ContinuousBackupsStatusEnabled is a ContinuousBackupsStatus enum value
@@ -19966,6 +21149,14 @@ const (
 	ContinuousBackupsStatusDisabled = "DISABLED"
 )
 
+// ContinuousBackupsStatus_Values returns all elements of the ContinuousBackupsStatus enum
+func ContinuousBackupsStatus_Values() []string {
+	return []string{
+		ContinuousBackupsStatusEnabled,
+		ContinuousBackupsStatusDisabled,
+	}
+}
+
 const (
 	// ContributorInsightsActionEnable is a ContributorInsightsAction enum value
 	ContributorInsightsActionEnable = "ENABLE"
@@ -19973,6 +21164,14 @@ const (
 	// ContributorInsightsActionDisable is a ContributorInsightsAction enum value
 	ContributorInsightsActionDisable = "DISABLE"
 )
+
+// ContributorInsightsAction_Values returns all elements of the ContributorInsightsAction enum
+func ContributorInsightsAction_Values() []string {
+	return []string{
+		ContributorInsightsActionEnable,
+		ContributorInsightsActionDisable,
+	}
+}
 
 const (
 	// ContributorInsightsStatusEnabling is a ContributorInsightsStatus enum value
@@ -19991,6 +21190,53 @@ const (
 	ContributorInsightsStatusFailed = "FAILED"
 )
 
+// ContributorInsightsStatus_Values returns all elements of the ContributorInsightsStatus enum
+func ContributorInsightsStatus_Values() []string {
+	return []string{
+		ContributorInsightsStatusEnabling,
+		ContributorInsightsStatusEnabled,
+		ContributorInsightsStatusDisabling,
+		ContributorInsightsStatusDisabled,
+		ContributorInsightsStatusFailed,
+	}
+}
+
+const (
+	// ExportFormatDynamodbJson is a ExportFormat enum value
+	ExportFormatDynamodbJson = "DYNAMODB_JSON"
+
+	// ExportFormatIon is a ExportFormat enum value
+	ExportFormatIon = "ION"
+)
+
+// ExportFormat_Values returns all elements of the ExportFormat enum
+func ExportFormat_Values() []string {
+	return []string{
+		ExportFormatDynamodbJson,
+		ExportFormatIon,
+	}
+}
+
+const (
+	// ExportStatusInProgress is a ExportStatus enum value
+	ExportStatusInProgress = "IN_PROGRESS"
+
+	// ExportStatusCompleted is a ExportStatus enum value
+	ExportStatusCompleted = "COMPLETED"
+
+	// ExportStatusFailed is a ExportStatus enum value
+	ExportStatusFailed = "FAILED"
+)
+
+// ExportStatus_Values returns all elements of the ExportStatus enum
+func ExportStatus_Values() []string {
+	return []string{
+		ExportStatusInProgress,
+		ExportStatusCompleted,
+		ExportStatusFailed,
+	}
+}
+
 const (
 	// GlobalTableStatusCreating is a GlobalTableStatus enum value
 	GlobalTableStatusCreating = "CREATING"
@@ -20004,6 +21250,16 @@ const (
 	// GlobalTableStatusUpdating is a GlobalTableStatus enum value
 	GlobalTableStatusUpdating = "UPDATING"
 )
+
+// GlobalTableStatus_Values returns all elements of the GlobalTableStatus enum
+func GlobalTableStatus_Values() []string {
+	return []string{
+		GlobalTableStatusCreating,
+		GlobalTableStatusActive,
+		GlobalTableStatusDeleting,
+		GlobalTableStatusUpdating,
+	}
+}
 
 const (
 	// IndexStatusCreating is a IndexStatus enum value
@@ -20019,6 +21275,16 @@ const (
 	IndexStatusActive = "ACTIVE"
 )
 
+// IndexStatus_Values returns all elements of the IndexStatus enum
+func IndexStatus_Values() []string {
+	return []string{
+		IndexStatusCreating,
+		IndexStatusUpdating,
+		IndexStatusDeleting,
+		IndexStatusActive,
+	}
+}
+
 const (
 	// KeyTypeHash is a KeyType enum value
 	KeyTypeHash = "HASH"
@@ -20027,6 +21293,14 @@ const (
 	KeyTypeRange = "RANGE"
 )
 
+// KeyType_Values returns all elements of the KeyType enum
+func KeyType_Values() []string {
+	return []string{
+		KeyTypeHash,
+		KeyTypeRange,
+	}
+}
+
 const (
 	// PointInTimeRecoveryStatusEnabled is a PointInTimeRecoveryStatus enum value
 	PointInTimeRecoveryStatusEnabled = "ENABLED"
@@ -20034,6 +21308,14 @@ const (
 	// PointInTimeRecoveryStatusDisabled is a PointInTimeRecoveryStatus enum value
 	PointInTimeRecoveryStatusDisabled = "DISABLED"
 )
+
+// PointInTimeRecoveryStatus_Values returns all elements of the PointInTimeRecoveryStatus enum
+func PointInTimeRecoveryStatus_Values() []string {
+	return []string{
+		PointInTimeRecoveryStatusEnabled,
+		PointInTimeRecoveryStatusDisabled,
+	}
+}
 
 const (
 	// ProjectionTypeAll is a ProjectionType enum value
@@ -20045,6 +21327,15 @@ const (
 	// ProjectionTypeInclude is a ProjectionType enum value
 	ProjectionTypeInclude = "INCLUDE"
 )
+
+// ProjectionType_Values returns all elements of the ProjectionType enum
+func ProjectionType_Values() []string {
+	return []string{
+		ProjectionTypeAll,
+		ProjectionTypeKeysOnly,
+		ProjectionTypeInclude,
+	}
+}
 
 const (
 	// ReplicaStatusCreating is a ReplicaStatus enum value
@@ -20061,7 +21352,26 @@ const (
 
 	// ReplicaStatusActive is a ReplicaStatus enum value
 	ReplicaStatusActive = "ACTIVE"
+
+	// ReplicaStatusRegionDisabled is a ReplicaStatus enum value
+	ReplicaStatusRegionDisabled = "REGION_DISABLED"
+
+	// ReplicaStatusInaccessibleEncryptionCredentials is a ReplicaStatus enum value
+	ReplicaStatusInaccessibleEncryptionCredentials = "INACCESSIBLE_ENCRYPTION_CREDENTIALS"
 )
+
+// ReplicaStatus_Values returns all elements of the ReplicaStatus enum
+func ReplicaStatus_Values() []string {
+	return []string{
+		ReplicaStatusCreating,
+		ReplicaStatusCreationFailed,
+		ReplicaStatusUpdating,
+		ReplicaStatusDeleting,
+		ReplicaStatusActive,
+		ReplicaStatusRegionDisabled,
+		ReplicaStatusInaccessibleEncryptionCredentials,
+	}
+}
 
 // Determines the level of detail about provisioned throughput consumption that
 // is returned in the response:
@@ -20087,6 +21397,15 @@ const (
 	ReturnConsumedCapacityNone = "NONE"
 )
 
+// ReturnConsumedCapacity_Values returns all elements of the ReturnConsumedCapacity enum
+func ReturnConsumedCapacity_Values() []string {
+	return []string{
+		ReturnConsumedCapacityIndexes,
+		ReturnConsumedCapacityTotal,
+		ReturnConsumedCapacityNone,
+	}
+}
+
 const (
 	// ReturnItemCollectionMetricsSize is a ReturnItemCollectionMetrics enum value
 	ReturnItemCollectionMetricsSize = "SIZE"
@@ -20094,6 +21413,14 @@ const (
 	// ReturnItemCollectionMetricsNone is a ReturnItemCollectionMetrics enum value
 	ReturnItemCollectionMetricsNone = "NONE"
 )
+
+// ReturnItemCollectionMetrics_Values returns all elements of the ReturnItemCollectionMetrics enum
+func ReturnItemCollectionMetrics_Values() []string {
+	return []string{
+		ReturnItemCollectionMetricsSize,
+		ReturnItemCollectionMetricsNone,
+	}
+}
 
 const (
 	// ReturnValueNone is a ReturnValue enum value
@@ -20112,6 +21439,17 @@ const (
 	ReturnValueUpdatedNew = "UPDATED_NEW"
 )
 
+// ReturnValue_Values returns all elements of the ReturnValue enum
+func ReturnValue_Values() []string {
+	return []string{
+		ReturnValueNone,
+		ReturnValueAllOld,
+		ReturnValueUpdatedOld,
+		ReturnValueAllNew,
+		ReturnValueUpdatedNew,
+	}
+}
+
 const (
 	// ReturnValuesOnConditionCheckFailureAllOld is a ReturnValuesOnConditionCheckFailure enum value
 	ReturnValuesOnConditionCheckFailureAllOld = "ALL_OLD"
@@ -20119,6 +21457,30 @@ const (
 	// ReturnValuesOnConditionCheckFailureNone is a ReturnValuesOnConditionCheckFailure enum value
 	ReturnValuesOnConditionCheckFailureNone = "NONE"
 )
+
+// ReturnValuesOnConditionCheckFailure_Values returns all elements of the ReturnValuesOnConditionCheckFailure enum
+func ReturnValuesOnConditionCheckFailure_Values() []string {
+	return []string{
+		ReturnValuesOnConditionCheckFailureAllOld,
+		ReturnValuesOnConditionCheckFailureNone,
+	}
+}
+
+const (
+	// S3SseAlgorithmAes256 is a S3SseAlgorithm enum value
+	S3SseAlgorithmAes256 = "AES256"
+
+	// S3SseAlgorithmKms is a S3SseAlgorithm enum value
+	S3SseAlgorithmKms = "KMS"
+)
+
+// S3SseAlgorithm_Values returns all elements of the S3SseAlgorithm enum
+func S3SseAlgorithm_Values() []string {
+	return []string{
+		S3SseAlgorithmAes256,
+		S3SseAlgorithmKms,
+	}
+}
 
 const (
 	// SSEStatusEnabling is a SSEStatus enum value
@@ -20137,6 +21499,17 @@ const (
 	SSEStatusUpdating = "UPDATING"
 )
 
+// SSEStatus_Values returns all elements of the SSEStatus enum
+func SSEStatus_Values() []string {
+	return []string{
+		SSEStatusEnabling,
+		SSEStatusEnabled,
+		SSEStatusDisabling,
+		SSEStatusDisabled,
+		SSEStatusUpdating,
+	}
+}
+
 const (
 	// SSETypeAes256 is a SSEType enum value
 	SSETypeAes256 = "AES256"
@@ -20144,6 +21517,14 @@ const (
 	// SSETypeKms is a SSEType enum value
 	SSETypeKms = "KMS"
 )
+
+// SSEType_Values returns all elements of the SSEType enum
+func SSEType_Values() []string {
+	return []string{
+		SSETypeAes256,
+		SSETypeKms,
+	}
+}
 
 const (
 	// ScalarAttributeTypeS is a ScalarAttributeType enum value
@@ -20155,6 +21536,15 @@ const (
 	// ScalarAttributeTypeB is a ScalarAttributeType enum value
 	ScalarAttributeTypeB = "B"
 )
+
+// ScalarAttributeType_Values returns all elements of the ScalarAttributeType enum
+func ScalarAttributeType_Values() []string {
+	return []string{
+		ScalarAttributeTypeS,
+		ScalarAttributeTypeN,
+		ScalarAttributeTypeB,
+	}
+}
 
 const (
 	// SelectAllAttributes is a Select enum value
@@ -20170,6 +21560,16 @@ const (
 	SelectCount = "COUNT"
 )
 
+// Select_Values returns all elements of the Select enum
+func Select_Values() []string {
+	return []string{
+		SelectAllAttributes,
+		SelectAllProjectedAttributes,
+		SelectSpecificAttributes,
+		SelectCount,
+	}
+}
+
 const (
 	// StreamViewTypeNewImage is a StreamViewType enum value
 	StreamViewTypeNewImage = "NEW_IMAGE"
@@ -20183,6 +21583,16 @@ const (
 	// StreamViewTypeKeysOnly is a StreamViewType enum value
 	StreamViewTypeKeysOnly = "KEYS_ONLY"
 )
+
+// StreamViewType_Values returns all elements of the StreamViewType enum
+func StreamViewType_Values() []string {
+	return []string{
+		StreamViewTypeNewImage,
+		StreamViewTypeOldImage,
+		StreamViewTypeNewAndOldImages,
+		StreamViewTypeKeysOnly,
+	}
+}
 
 const (
 	// TableStatusCreating is a TableStatus enum value
@@ -20207,6 +21617,19 @@ const (
 	TableStatusArchived = "ARCHIVED"
 )
 
+// TableStatus_Values returns all elements of the TableStatus enum
+func TableStatus_Values() []string {
+	return []string{
+		TableStatusCreating,
+		TableStatusUpdating,
+		TableStatusDeleting,
+		TableStatusActive,
+		TableStatusInaccessibleEncryptionCredentials,
+		TableStatusArchiving,
+		TableStatusArchived,
+	}
+}
+
 const (
 	// TimeToLiveStatusEnabling is a TimeToLiveStatus enum value
 	TimeToLiveStatusEnabling = "ENABLING"
@@ -20220,3 +21643,13 @@ const (
 	// TimeToLiveStatusDisabled is a TimeToLiveStatus enum value
 	TimeToLiveStatusDisabled = "DISABLED"
 )
+
+// TimeToLiveStatus_Values returns all elements of the TimeToLiveStatus enum
+func TimeToLiveStatus_Values() []string {
+	return []string{
+		TimeToLiveStatusEnabling,
+		TimeToLiveStatusDisabling,
+		TimeToLiveStatusEnabled,
+		TimeToLiveStatusDisabled,
+	}
+}

@@ -10,3 +10,14 @@ generate:
 
 example:
 	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out=examplepb --dynamo_out=examplepb
+
+.PHONY: adddep
+adddep:
+	go mod tidy -v
+	go mod vendor
+
+.PHONY: updatedeps
+updatedeps:
+	go get -u ./...
+	go mod tidy -v
+	go mod vendor

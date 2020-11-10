@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package examplepb;
 
+option go_package = "github.com/pquerna/protoc-gen-dynamo/examplepb";
+
 import "dynamo/dynamo.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -17,6 +19,6 @@ message Store {
   repeated string best_employee_ids = 8 [(dynamo.field).type.set = true];
   google.protobuf.Timestamp bin_date = 9 [(dynamo.field).type.binary = true];
 
-  uint64 foo =99;
+  uint64 foo = 99;
   repeated uint64 morefoo = 100 [(dynamo.field).type.set = true];
 }
