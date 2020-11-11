@@ -9,7 +9,7 @@ generate:
 	protoc dynamo.proto --proto_path=dynamo --go_out=import_path=dynamo,paths=source_relative:dynamo
 
 example:
-	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out=examplepb --dynamo_out=examplepb
+	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out="paths=source_relative:examplepb" --dynamo_out="lang=go,paths=source_relative:examplepb"
 
 .PHONY: adddep
 adddep:

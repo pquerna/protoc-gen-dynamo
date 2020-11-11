@@ -24,6 +24,8 @@ github.com/aws/aws-sdk-go/private/protocol/rest
 github.com/aws/aws-sdk-go/service/dynamodb
 # github.com/dave/jennifer v1.4.1
 github.com/dave/jennifer/jen
+# github.com/davecgh/go-spew v1.1.0
+github.com/davecgh/go-spew/spew
 # github.com/golang/protobuf v1.4.3
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor

@@ -8,7 +8,8 @@ import "dynamo/dynamo.proto";
 import "google/protobuf/timestamp.proto";
 
 message Store {
-  option (dynamo.msg).partition = {name: "pk", prefix: "store", fields: ["id"]};
+  option (dynamo.msg).partition = {name: "pk", prefix: "store", fields: ["id", "country", "foo"]};
+
   string id = 1 [(dynamo.field).name = "store_id"];
   string country = 2;
   string region = 3;

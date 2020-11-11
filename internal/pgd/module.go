@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/dave/jennifer/jen"
+	"github.com/davecgh/go-spew/spew"
 	"github.com/lyft/protoc-gen-star"
 	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
 	"github.com/pquerna/protoc-gen-dynamo/internal/pb/dynamopb"
@@ -66,6 +67,7 @@ const (
 	protoPkg   = "github.com/golang/protobuf/proto"
 	awsPkg     = "github.com/aws/aws-sdk-go/aws"
 	strconvPkg = "strconv"
+	stringsPkg = "strings"
 	fmtPkg     = "fmt"
 )
 
@@ -82,6 +84,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(protoPkg, "proto")
 	f.ImportName(strconvPkg, "strconv")
 	f.ImportName(fmtPkg, "fmt")
+	f.ImportName(stringsPkg, "strings")
 
 	// https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Marshaler
 	// https://godoc.org/github.com/guregu/dynamo#Marshaler
@@ -152,6 +155,15 @@ func getAVType(field pgs.Field, fext *dynamopb.DynamoFieldOptions) avType {
 	panic(fmt.Sprintf("getAVType: failed to determine dynamodb type: %T %+v", field, fext.Type))
 }
 
+func fieldByName(msg pgs.Message, name string) pgs.Field {
+	for _,f := range msg.Fields() {
+		if f.Name().LowerSnakeCase().String() == name {
+			return f
+		}
+	}
+	panic(fmt.Sprintf("Failed to find field %s on %s", name, msg.FullyQualifiedName()))
+}
+
 func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 	for _, msg := range in.AllMessages() {
 		structName := m.ctx.Name(msg)
@@ -185,8 +197,72 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		needNullBoolTrue := false
 		needStructCopy := false
 		needProtoBuffer := false
+		needStringBuilder := false
 		const structCopy = "structCopy"
 		const protoBuffer = "pbuf"
+		const stringBuffer = "sb"
+		computedKeys := make([]*dynamopb.Key, 0)
+		if mext.Partition != nil {
+			computedKeys = append(computedKeys, mext.Partition)
+		}
+		if mext.Sort != nil {
+			computedKeys = append(computedKeys, mext.Sort)
+		}
+		if mext.CompoundField != nil {
+			computedKeys = append(computedKeys, mext.CompoundField...)
+		}
+
+		if false {
+			m.Log(spew.Sprint(computedKeys))
+		}
+		for _, ck := range computedKeys {
+			refId++
+			vname := fmt.Sprintf("v%d", refId)
+
+			sep := ck.Separator
+			if sep == "" {
+				sep = ":"
+			}
+
+			needStringBuilder = true
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
+
+			if ck.Prefix != "" {
+				stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+					jen.Lit(ck.Prefix + sep),
+					))
+			}
+
+			first := true
+			for _, fn := range ck.Fields {
+				field := fieldByName(msg, fn)
+				pt := field.Type().ProtoType()
+				srcName := field.Name().UpperCamelCase().String()
+				if !first {
+					stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+						jen.Lit(sep),
+					))
+				}
+				first = false
+				switch {
+				case pt == pgs.StringT:
+					stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+						jen.Id("p").Dot(srcName),
+					))
+				case pt.IsNumeric():
+					fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
+					stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+						fmtCall,
+					))
+				default:
+					panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
+				}
+			}
+			stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
+			d[jen.Lit(ck.Name)] = jen.Id(vname)
+		}
+
 		for _, field := range msg.Fields() {
 			fext := dynamopb.DynamoFieldOptions{}
 			ok, err := field.Extension(dynamopb.E_Field, &fext)
@@ -298,7 +374,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 				})
 			case avt_map:
 				// avt_map: impl
-				panic("not done")
+				// panic("applyMarshal not done: avt_map")
 			case avt_number:
 				fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
 				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
@@ -407,6 +483,13 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			}, stmts...)
 		}
 
+		if needStringBuilder {
+			stmts = append([]jen.Code{
+				jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+			}, stmts...)
+		}
+
+
 		stmts = append(stmts, jen.Id("av").Dot("M").Op("=").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue").Values(d))
 
 		stmts = append(stmts, jen.Return(jen.Nil()))
@@ -461,11 +544,11 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 				case avt_bool:
 					g.Id("p").Dot(dstName).Op("=").Qual(awsPkg, "BoolValue").Call(jen.Id("av").Dot("BOOL"))
 				case avt_byte_set:
-					panic("not done")
+					panic("applyUnmarshal not done: avt_byte_set")
 				case avt_list:
-					panic("not done")
+					panic("applyUnmarshal not done: avt_list")
 				case avt_map:
-					panic("not done")
+					// panic("applyUnmarshal not done: avt_map")
 				case avt_number:
 					needErr = true
 					np := numberParseStatement(pt, jen.Id("av").Dot("N"))
@@ -478,7 +561,7 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 						)),
 					)
 				case avt_number_set:
-					panic("not done")
+					// panic("applyUnmarshal: not done: avt_number_set")
 				case avt_null:
 					// no op
 				case avt_string:
@@ -490,7 +573,7 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 						),
 					)
 				case avt_string_set:
-					panic("not done")
+					// panic("applyUnmarshal not done: avt_string_set")
 				}
 			}))
 		}
