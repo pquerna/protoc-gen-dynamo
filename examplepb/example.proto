@@ -10,15 +10,17 @@ import "google/protobuf/timestamp.proto";
 message Store {
   option (dynamo.msg).partition = {name: "pk", prefix: "store", fields: ["id", "country", "foo"]};
 
-  string id = 1 [(dynamo.field).name = "store_id"];
+  string id = 1 [(dynamo.field).name = "store_id", (dynamo.field).expose = true];
   string country = 2;
   string region = 3;
   string state = 4;
   string city = 5;
   bool closed = 6;
-  google.protobuf.Timestamp opening_date = 7 [(dynamo.field).type.unix_second = true];
+  google.protobuf.Timestamp opening_date = 7 [
+                                             (dynamo.field).type.unix_second = true
+                                             ];
   repeated string best_employee_ids = 8 [(dynamo.field).type.set = true];
-  google.protobuf.Timestamp bin_date = 9 [(dynamo.field).type.binary = true];
+  google.protobuf.Timestamp bin_date = 9;
 
   uint64 foo = 99;
   repeated uint64 morefoo = 100 [(dynamo.field).type.set = true];

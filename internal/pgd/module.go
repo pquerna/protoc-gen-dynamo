@@ -7,7 +7,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lyft/protoc-gen-star"
 	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
-	"github.com/pquerna/protoc-gen-dynamo/internal/pb/dynamopb"
+	dynamopb "github.com/pquerna/protoc-gen-dynamo/dynamo"
 )
 
 const (
@@ -156,13 +156,18 @@ func getAVType(field pgs.Field, fext *dynamopb.DynamoFieldOptions) avType {
 }
 
 func fieldByName(msg pgs.Message, name string) pgs.Field {
-	for _,f := range msg.Fields() {
+	for _, f := range msg.Fields() {
 		if f.Name().LowerSnakeCase().String() == name {
 			return f
 		}
 	}
 	panic(fmt.Sprintf("Failed to find field %s on %s", name, msg.FullyQualifiedName()))
 }
+
+const (
+	valueField = "value"
+	typeField  = "typ"
+)
 
 func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 	for _, msg := range in.AllMessages() {
@@ -195,10 +200,8 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		d := jen.Dict{}
 		needErr := false
 		needNullBoolTrue := false
-		needStructCopy := false
 		needProtoBuffer := false
 		needStringBuilder := false
-		const structCopy = "structCopy"
 		const protoBuffer = "pbuf"
 		const stringBuffer = "sb"
 		computedKeys := make([]*dynamopb.Key, 0)
@@ -215,6 +218,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		if false {
 			m.Log(spew.Sprint(computedKeys))
 		}
+
 		for _, ck := range computedKeys {
 			refId++
 			vname := fmt.Sprintf("v%d", refId)
@@ -230,8 +234,8 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 
 			if ck.Prefix != "" {
 				stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-					jen.Lit(ck.Prefix + sep),
-					))
+					jen.Lit(ck.Prefix+sep),
+				))
 			}
 
 			first := true
@@ -263,16 +267,45 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			d[jen.Lit(ck.Name)] = jen.Id(vname)
 		}
 
+		typeName := fmt.Sprintf("type.googleapis.com/%s.%s", msg.Package().ProtoName().String(), msg.Name())
+
+		needProtoBuffer = true
+		needErr = true
+		refId++
+		vname := fmt.Sprintf("v%d", refId)
+		stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+		stmts = append(stmts, jen.Id(protoBuffer).Dot("Reset").Call())
+		stmts = append(stmts, jen.Id("err").Op("=").Id(protoBuffer).Dot("Marshal").Call(jen.Id("p")))
+		stmts = append(stmts,
+			jen.If(jen.Id("err").Op("!=").Nil()).Block(
+				jen.Return(jen.Id("err")),
+			),
+		)
+		stmts = append(stmts, jen.Id(vname).Dot("B").Op("=").Id(protoBuffer).Dot("Bytes").Call())
+		d[jen.Lit(valueField)] = jen.Id(vname)
+
+		refId++
+		vname = fmt.Sprintf("v%d", refId)
+		stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+		stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Lit(typeName)))
+		d[jen.Lit(typeField)] = jen.Id(vname)
+
 		for _, field := range msg.Fields() {
 			fext := dynamopb.DynamoFieldOptions{}
 			ok, err := field.Extension(dynamopb.E_Field, &fext)
 			if err != nil {
 				m.Failf("Error: Parsing dynamo.field failed for '%s': %s", field.FullyQualifiedName(), err)
 			}
-			if ok && fext.Skip {
-				m.Logf("dynamo.field.skip: skipped %s", field.FullyQualifiedName())
+
+			if !ok {
+				m.Debugf("dynamo.field.expose: skipped %s (no extension)", field.FullyQualifiedName())
 				continue
 			}
+			if !fext.Expose {
+				m.Debugf("dynamo.field.expose: skipped %s (not exposed)", field.FullyQualifiedName())
+				continue
+			}
+
 			if fext.Type == nil {
 				fext.Type = &dynamopb.Types{}
 			}
@@ -292,26 +325,6 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			}
 
 			avt := getAVType(field, &fext)
-
-			if fext.Type.Binary {
-				needStructCopy = true
-				needProtoBuffer = true
-				needErr = true
-
-				// special case: store whole field as protobuf marshaled force binary encoded
-				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-				stmts = append(stmts, jen.Id(structCopy).Dot("Reset").Call())
-				stmts = append(stmts, jen.Id(protoBuffer).Dot("Reset").Call())
-				stmts = append(stmts, jen.Id(structCopy).Dot(srcName).Op("=").Id("p").Dot(srcName))
-				stmts = append(stmts, jen.Id("err").Op("=").Id(protoBuffer).Dot("Marshal").Call(jen.Id(structCopy)))
-				stmts = append(stmts,
-					jen.If(jen.Id("err").Op("!=").Nil()).Block(
-						jen.Return(jen.Id("err")),
-					),
-				)
-				stmts = append(stmts, jen.Id(vname).Dot("B").Op("=").Id(protoBuffer).Dot("Bytes").Call())
-				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Id(vname)
-			}
 
 			switch avt {
 			case avt_bytes:
@@ -374,7 +387,8 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 				})
 			case avt_map:
 				// avt_map: impl
-				// panic("applyMarshal not done: avt_map")
+				m.Failf("dynamo.field: not done: avt_map type: %s", field.FullyQualifiedName())
+				panic("applyMarshal not done: avt_map")
 			case avt_number:
 				fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
 				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
@@ -465,12 +479,6 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			}, stmts...)
 		}
 
-		if needStructCopy {
-			stmts = append([]jen.Code{
-				jen.Id(structCopy).Op(":=").Op("&").Id(structName.String()).Values(),
-			}, stmts...)
-		}
-
 		if needProtoBuffer {
 			stmts = append([]jen.Code{
 				jen.Id(protoBuffer).Op(":=").Qual(protoPkg, "NewBuffer").Call(jen.Nil()),
@@ -488,7 +496,6 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 				jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
 			}, stmts...)
 		}
-
 
 		stmts = append(stmts, jen.Id("av").Dot("M").Op("=").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue").Values(d))
 
@@ -517,86 +524,33 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 		}
 
 		stmts := []jen.Code{}
-		needErr := false
-		loop := []jen.Code{}
-		needValue := false
-		for _, field := range msg.Fields() {
-			fext := dynamopb.DynamoFieldOptions{}
-			ok, err := field.Extension(dynamopb.E_Field, &fext)
-			if err != nil {
-				m.Failf("Error: Parsing dynamo.field failed for '%s': %s", field.FullyQualifiedName(), err)
-			}
-			if ok && fext.Skip {
-				m.Logf("dynamo.field.skip: skipped %s", field.FullyQualifiedName())
-				continue
-			}
-			if fext.Type == nil {
-				fext.Type = &dynamopb.Types{}
-			}
-			pt := field.Type().ProtoType()
-			dstName := field.Name().UpperCamelCase().String()
 
-			loop = append(loop, jen.Case(jen.Lit(field.Name().LowerSnakeCase().String())).BlockFunc(func(g *jen.Group) {
-				avt := getAVType(field, &fext)
-				switch avt {
-				case avt_bytes:
-					g.Id("p").Dot(dstName).Op("=").Id("av").Dot("B")
-				case avt_bool:
-					g.Id("p").Dot(dstName).Op("=").Qual(awsPkg, "BoolValue").Call(jen.Id("av").Dot("BOOL"))
-				case avt_byte_set:
-					panic("applyUnmarshal not done: avt_byte_set")
-				case avt_list:
-					panic("applyUnmarshal not done: avt_list")
-				case avt_map:
-					// panic("applyUnmarshal not done: avt_map")
-				case avt_number:
-					needErr = true
-					np := numberParseStatement(pt, jen.Id("av").Dot("N"))
-					g.List(jen.Id("p").Dot(dstName), jen.Id("err")).Op("=").Add(np)
-					g.If(jen.Id("err").Op("!=").Nil()).Block(
-						jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
-							jen.Lit(fmt.Sprintf("%s: Failed to parse '%s' as number: %s", field.FullyQualifiedName(), "%s", "%w")),
-							jen.Qual(awsPkg, "StringValue").Call(jen.Id("av").Dot("N")),
-							jen.Id("err"),
-						)),
-					)
-				case avt_number_set:
-					// panic("applyUnmarshal: not done: avt_number_set")
-				case avt_null:
-					// no op
-				case avt_string:
-					g.If(jen.Qual(awsPkg, "BoolValue").Call(jen.Id("av").Dot("NULL"))).Block(
-						jen.Id("p").Dot(dstName).Op("=").Lit(""),
-					).Else().Block(
-						jen.Id("p").Dot(dstName).Op("=").Qual(awsPkg, "StringValue").Call(
-							jen.Id("av").Dot("S"),
-						),
-					)
-				case avt_string_set:
-					// panic("applyUnmarshal not done: avt_string_set")
-				}
-			}))
-		}
+		typeName := fmt.Sprintf("type.googleapis.com/%s.%s", msg.Package().ProtoName().String(), msg.Name())
 
-		if needErr {
-			stmts = append([]jen.Code{
-				jen.Var().Id("err").Error(),
-			}, stmts...)
-		}
-
-		valueId := "value"
-		if !needValue {
-			valueId = "_"
-		}
 		stmts = append(stmts,
-			jen.For(jen.List(jen.Id("key"), jen.Id(valueId)).Op(":=").Range().Id("av").Dot("M")).Block(
-				jen.Switch(jen.Id("key")).Block(
-					loop...,
+			jen.List(jen.Id(typeField), jen.Id("ok")).Op(":=").Id("av").Dot("M").Index(jen.Lit(typeField)),
+			jen.If(jen.Op("!").Id("ok")).Block(
+				jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+					jen.Lit("dyanmo: "+typeField+" missing"),
 				),
-			),
+				)),
+			jen.If(jen.Qual(awsPkg, "StringValue").Call(jen.Id(typeField).Dot("S")).Op("!=").Lit(typeName)).Block(
+				jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+					jen.Lit(fmt.Sprintf("dyanmo: _type mismatch: %s expected, got: '%s'", typeName, "%s")),
+					jen.Id(typeField),
+				),
+				)),
 		)
 
-		stmts = append(stmts, jen.Return(jen.Nil()))
+		stmts = append(stmts,
+			jen.List(jen.Id(valueField), jen.Id("ok")).Op(":=").Id("av").Dot("M").Index(jen.Lit(valueField)),
+			jen.If(jen.Op("!").Id("ok")).Block(
+				jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+					jen.Lit("dyanmo: "+valueField+" missing"),
+				),
+				)),
+			jen.Return(jen.Qual(protoPkg, "Unmarshal").Call(jen.Id(valueField).Dot("B"), jen.Id("p"))),
+		)
 
 		f.Func().Params(
 			jen.Id("p").Op("*").Id(structName.String()),
