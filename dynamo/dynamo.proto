@@ -34,13 +34,12 @@ extend google.protobuf.FieldOptions {
 }
 
 message DynamoFieldOptions {
-  bool skip = 1;
+  bool expose = 1;
   string name = 2;
   Types type = 3;
 }
 
 message Types {
-  bool binary = 100;
   bool set = 200;
   bool unix_second = 300;
   bool unix_milli = 301;
