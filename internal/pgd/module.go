@@ -576,7 +576,17 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 			jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(jen.Id("av"))),
 		).Line()
 
+		f.Func().Params(
+			jen.Id("p").Op("*").Id(structName.String()),
+		).Id("UnmarshalDynamoItem").Params(jen.Id("av").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
+			jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(
+				jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+					jen.Id("M"): jen.Id("av"),
+				}),
+			)),
+		).Line()
 	}
+
 	return nil
 }
 

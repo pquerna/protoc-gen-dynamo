@@ -1,7 +1,7 @@
 MAKEFLAGS += --no-builtin-rules
 MAKEFLAGS += --no-builtin-variables
 
-
+.PHONY: install
 install:
 	go install -mod=vendor -v .
 
