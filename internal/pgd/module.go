@@ -190,6 +190,17 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			jen.Return(jen.Id("av"), jen.Nil()),
 		).Line()
 
+		f.Func().Params(
+			jen.Id("p").Op("*").Id(structName.String()),
+		).Id("MarshalDynamoItem").Params().List(jen.Params(jen.Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue"), jen.Id("error"))).Block(
+			jen.Id("av").Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(),
+			jen.Id("err").Op(":=").Id("p").Dot("MarshalDynamoDBAttributeValue").Call(jen.Id("av")),
+			jen.If(jen.Id("err").Op("!=").Nil()).Block(
+				jen.Return(jen.Nil(), jen.Id("err")),
+			),
+			jen.Return(jen.Id("av").Dot("M"), jen.Nil()),
+		).Line()
+
 		stmts := []jen.Code{}
 		refId := 0
 		d := jen.Dict{}
@@ -493,6 +504,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		stmts = append(stmts, jen.Id("av").Dot("M").Op("=").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue").Values(d))
 
 		stmts = append(stmts, jen.Return(jen.Nil()))
+
 		f.Func().Params(
 			jen.Id("p").Op("*").Id(structName.String()),
 		).Id("MarshalDynamoDBAttributeValue").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
@@ -609,6 +621,7 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 		).Id("UnmarshalDynamo").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
 			jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(jen.Id("av"))),
 		).Line()
+
 	}
 	return nil
 }
