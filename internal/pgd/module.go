@@ -362,13 +362,20 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			refId++
 			vname := fmt.Sprintf("v%d", refId)
 
-			needStringBuilder = true
-			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			if ck.Const != "" {
+				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+					jen.Id("S"): jen.Qual(awsPkg, "String").Call(jen.Lit(ck.Const)),
+				}))
+				d[jen.Lit(ck.Name)] = jen.Id(vname)
+			} else {
+				needStringBuilder = true
+				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
 
-			stmts = generateKeyStringer(msg, stmts, ck, stringBuffer)
+				stmts = generateKeyStringer(msg, stmts, ck, stringBuffer)
 
-			stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
-			d[jen.Lit(ck.Name)] = jen.Id(vname)
+				stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
+				d[jen.Lit(ck.Name)] = jen.Id(vname)
+			}
 		}
 
 		typeName := fmt.Sprintf("type.googleapis.com/%s.%s", msg.Package().ProtoName().String(), msg.Name())
