@@ -100,6 +100,11 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 		return err
 	}
 
+	err = m.applyKeyFuncs(f, in)
+	if err != nil {
+		return err
+	}
+
 	return f.Render(buf)
 }
 
@@ -164,6 +169,111 @@ func fieldByName(msg pgs.Message, name string) pgs.Field {
 	panic(fmt.Sprintf("Failed to find field %s on %s", name, msg.FullyQualifiedName()))
 }
 
+func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
+	const stringBuffer = "sb"
+	for _, msg := range in.AllMessages() {
+		structName := m.ctx.Name(msg)
+		mext := dynamopb.DynamoMessageOptions{}
+		ok, err := msg.Extension(dynamopb.E_Msg, &mext)
+		if err != nil {
+			m.Logf("Parsing dynamo.msg.disabled failed: %s", err)
+			m.Fail("code generation failed")
+		}
+		if ok && mext.Disabled {
+			m.Logf("dynamo.msg disabled for %s", structName)
+			continue
+		}
+
+		keys := []struct {
+			ck   *dynamopb.Key
+			name string
+		}{
+			{
+				ck:   mext.Partition,
+				name: "PartitionKey",
+			},
+			{
+				ck:   mext.Sort,
+				name: "SortKey",
+			},
+		}
+
+		for _, key := range keys {
+			if key.ck == nil {
+				continue
+			}
+			stmts := []jen.Code{
+				jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+			}
+			stmts = generateKeyStringer(msg, stmts, key.ck, stringBuffer)
+			stmts = append(stmts,
+				jen.Return(jen.Id(stringBuffer).Dot("String").Call()),
+			)
+
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id(key.name).Params().List(jen.String()).Block(
+				stmts...,
+			).Line()
+
+			params := []jen.Code{}
+			d := jen.Dict{}
+			for _, fn := range key.ck.Fields {
+				field := fieldByName(msg, fn)
+				typ := m.ctx.Type(field)
+				params = append(params, jen.Id(field.Name().LowerCamelCase().String()).Id(typ.String()))
+				d[jen.Id(field.Name().UpperCamelCase().String())] = jen.Id(field.Name().LowerCamelCase().String())
+			}
+
+			f.Func().Id(structName.String() + key.name).Params(params...).List(jen.String()).Block(
+				jen.Return(jen.Call(jen.Op("&").Id(structName.String()).Values(d)).Dot(key.name).Call()),
+			).Line()
+		}
+	}
+	return nil
+}
+
+func generateKeyStringer(msg pgs.Message, stmts []jen.Code, ck *dynamopb.Key, stringBuffer string) []jen.Code {
+	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
+
+	sep := ck.Separator
+	if sep == "" {
+		sep = ":"
+	}
+
+	if ck.Prefix != "" {
+		stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+			jen.Lit(ck.Prefix+sep),
+		))
+	}
+	first := true
+	for _, fn := range ck.Fields {
+		field := fieldByName(msg, fn)
+		pt := field.Type().ProtoType()
+		srcName := field.Name().UpperCamelCase().String()
+		if !first {
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+				jen.Lit(sep),
+			))
+		}
+		first = false
+		switch {
+		case pt == pgs.StringT:
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+				jen.Id("p").Dot(srcName),
+			))
+		case pt.IsNumeric():
+			fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+				fmtCall,
+			))
+		default:
+			panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
+		}
+	}
+	return stmts
+}
+
 const (
 	valueField = "value"
 	typeField  = "typ"
@@ -182,6 +292,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			m.Logf("dynamo.msg disabled for %s", structName)
 			continue
 		}
+
 		// https://godoc.org/github.com/guregu/dynamo#Marshaler:
 		// MarshalDynamo() (*dynamodb.AttributeValue, error)
 		f.Func().Params(
@@ -234,46 +345,11 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			refId++
 			vname := fmt.Sprintf("v%d", refId)
 
-			sep := ck.Separator
-			if sep == "" {
-				sep = ":"
-			}
-
 			needStringBuilder = true
 			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-			stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
 
-			if ck.Prefix != "" {
-				stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-					jen.Lit(ck.Prefix+sep),
-				))
-			}
+			stmts = generateKeyStringer(msg, stmts, ck, stringBuffer)
 
-			first := true
-			for _, fn := range ck.Fields {
-				field := fieldByName(msg, fn)
-				pt := field.Type().ProtoType()
-				srcName := field.Name().UpperCamelCase().String()
-				if !first {
-					stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-						jen.Lit(sep),
-					))
-				}
-				first = false
-				switch {
-				case pt == pgs.StringT:
-					stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-						jen.Id("p").Dot(srcName),
-					))
-				case pt.IsNumeric():
-					fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
-					stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-						fmtCall,
-					))
-				default:
-					panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
-				}
-			}
 			stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
 			d[jen.Lit(ck.Name)] = jen.Id(vname)
 		}
