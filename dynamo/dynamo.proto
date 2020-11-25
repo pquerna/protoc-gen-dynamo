@@ -27,6 +27,9 @@ message Key {
   string prefix = 3;
   // defaults to `:` if unset, only used if more than one field is set
   string separator = 4;
+
+  // If set, the value of key is set to a constant string.  Fields, prefix, and separator are ignored.
+  string const = 5;
 }
 
 extend google.protobuf.FieldOptions {

@@ -9,6 +9,10 @@ import "google/protobuf/timestamp.proto";
 
 message Store {
   option (dynamo.msg).partition = {name: "pk", prefix: "store", fields: ["id", "country", "foo"]};
+  option (dynamo.msg).sort = {name: "sk", const: "example"};
+
+  option (dynamo.msg).compound_field = {name: "gsi1pk", prefix: "store", fields: ["id", "country", "foo"]};
+  option (dynamo.msg).compound_field = {name: "gsi1sk", const: "dummyvalue"};
 
   string id = 1 [(dynamo.field).name = "store_id", (dynamo.field).expose = true];
   string country = 2;
