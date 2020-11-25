@@ -169,6 +169,11 @@ func fieldByName(msg pgs.Message, name string) pgs.Field {
 	panic(fmt.Sprintf("Failed to find field %s on %s", name, msg.FullyQualifiedName()))
 }
 
+type namedKey struct {
+	name string
+	key  *dynamopb.Key
+}
+
 func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 	const stringBuffer = "sb"
 	for _, msg := range in.AllMessages() {
@@ -184,31 +189,43 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			continue
 		}
 
-		keys := []struct {
-			ck   *dynamopb.Key
-			name string
-		}{
+		keys := []namedKey{
 			{
-				ck:   mext.Partition,
+				key:  mext.Partition,
 				name: "PartitionKey",
 			},
 			{
-				ck:   mext.Sort,
+				key:  mext.Sort,
 				name: "SortKey",
 			},
 		}
 
+		for _, ck := range mext.CompoundField {
+			keys = append(keys,
+				namedKey{
+					name: pgs.Name(ck.Name).UpperCamelCase().String() + "Key",
+					key:  ck,
+				})
+		}
+
 		for _, key := range keys {
-			if key.ck == nil {
+			if key.key == nil {
 				continue
 			}
-			stmts := []jen.Code{
-				jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+			stmts := []jen.Code{}
+			if key.key.Const != "" {
+				stmts = append(stmts,
+					jen.Return(jen.Lit(key.key.Const)),
+				)
+			} else {
+				stmts = append(stmts,
+					jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+				)
+				stmts = generateKeyStringer(msg, stmts, key.key, stringBuffer)
+				stmts = append(stmts,
+					jen.Return(jen.Id(stringBuffer).Dot("String").Call()),
+				)
 			}
-			stmts = generateKeyStringer(msg, stmts, key.ck, stringBuffer)
-			stmts = append(stmts,
-				jen.Return(jen.Id(stringBuffer).Dot("String").Call()),
-			)
 
 			f.Func().Params(
 				jen.Id("p").Op("*").Id(structName.String()),
@@ -218,7 +235,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 			params := []jen.Code{}
 			d := jen.Dict{}
-			for _, fn := range key.ck.Fields {
+			for _, fn := range key.key.Fields {
 				field := fieldByName(msg, fn)
 				typ := m.ctx.Type(field)
 				params = append(params, jen.Id(field.Name().LowerCamelCase().String()).Id(typ.String()))
@@ -345,13 +362,20 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			refId++
 			vname := fmt.Sprintf("v%d", refId)
 
-			needStringBuilder = true
-			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			if ck.Const != "" {
+				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+					jen.Id("S"): jen.Qual(awsPkg, "String").Call(jen.Lit(ck.Const)),
+				}))
+				d[jen.Lit(ck.Name)] = jen.Id(vname)
+			} else {
+				needStringBuilder = true
+				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
 
-			stmts = generateKeyStringer(msg, stmts, ck, stringBuffer)
+				stmts = generateKeyStringer(msg, stmts, ck, stringBuffer)
 
-			stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
-			d[jen.Lit(ck.Name)] = jen.Id(vname)
+				stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
+				d[jen.Lit(ck.Name)] = jen.Id(vname)
+			}
 		}
 
 		typeName := fmt.Sprintf("type.googleapis.com/%s.%s", msg.Package().ProtoName().String(), msg.Name())
