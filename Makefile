@@ -7,10 +7,9 @@ install:
 
 generate:
 	protoc \
-      -I dynamo \
-      --go_out="plugins=grpc,paths=source_relative:dynamo" \
-      dynamo/*.proto
-#	protoc dynamo.proto --proto_path=dynamo --go_out=import_path=dynamo,paths=source_relative:dynamo
+	-I . \
+	--go_out="plugins=grpc,paths=source_relative:." \
+	dynamo/*.proto
 
 example:
 	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out="paths=source_relative:examplepb" --dynamo_out="lang=go,paths=source_relative:examplepb"
