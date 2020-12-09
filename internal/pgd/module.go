@@ -178,10 +178,6 @@ type namedKey struct {
 }
 
 func (m *Module) applyVersionFuncs(msg pgs.Message, key namedKey, f *jen.File) error {
-	m.Logf("Apply Version")
-	structName := m.ctx.Name(msg)
-	//stmts := []jen.Code{}
-
 	if key.key.Const != "" {
 		return errors.New("version: constants not allowed")
 	}
@@ -190,6 +186,7 @@ func (m *Module) applyVersionFuncs(msg pgs.Message, key namedKey, f *jen.File) e
 		return errors.New("version: exactly 1 field is required")
 	}
 
+	structName := m.ctx.Name(msg)
 	fn := key.key.Fields[0]
 	field := fieldByName(msg, fn)
 	srcName := field.Name().UpperCamelCase().String()
