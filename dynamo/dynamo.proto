@@ -19,6 +19,8 @@ message DynamoMessageOptions {
   Key sort = 3;
   // A list of compound values that can be set from other fields.
   repeated Key compound_field = 4;
+  // A value that can be used as a item version.
+  Key version = 5;
 }
 
 message Key {
