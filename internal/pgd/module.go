@@ -2,10 +2,12 @@ package pgd
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+
 	"github.com/dave/jennifer/jen"
 	"github.com/davecgh/go-spew/spew"
-	"github.com/lyft/protoc-gen-star"
+	pgs "github.com/lyft/protoc-gen-star"
 	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
 	dynamopb "github.com/pquerna/protoc-gen-dynamo/dynamo"
 )
@@ -66,6 +68,7 @@ const (
 	dynamoPkg  = "github.com/aws/aws-sdk-go/service/dynamodb"
 	protoPkg   = "github.com/golang/protobuf/proto"
 	awsPkg     = "github.com/aws/aws-sdk-go/aws"
+	ptypesPkg  = "github.com/golang/protobuf/ptypes"
 	strconvPkg = "strconv"
 	stringsPkg = "strings"
 	fmtPkg     = "fmt"
@@ -174,6 +177,50 @@ type namedKey struct {
 	key  *dynamopb.Key
 }
 
+func (m *Module) applyVersionFuncs(msg pgs.Message, key namedKey, f *jen.File) error {
+	if key.key.Const != "" {
+		return errors.New("version: constants not allowed")
+	}
+
+	if len(key.key.Fields) != 1 {
+		return errors.New("version: exactly 1 field is required")
+	}
+
+	structName := m.ctx.Name(msg)
+	fn := key.key.Fields[0]
+	field := fieldByName(msg, fn)
+	srcName := field.Name().UpperCamelCase().String()
+
+	var stmts []jen.Code
+	if field.Type().ProtoType().IsNumeric() {
+		// return int64(p.<fieldName>)
+		stmts = append(stmts, jen.Return(jen.List(jen.Int64().Parens(jen.Id("p").Dot(srcName)), jen.Nil())))
+	} else {
+		d := field.Descriptor().TypeName
+		if d != nil && *d == ".google.protobuf.Timestamp" {
+			// t, err := ptypes.Timestamp(p.<fieldName>)
+			// if err != nil { return 0, err }
+			// return t.UnixNano(), nil
+			f.ImportName(ptypesPkg, "ptypes")
+			stmts = append(stmts, jen.List(jen.Id("t"), jen.Id("err")).Op(":=").Qual(ptypesPkg, "Timestamp").Call(
+				jen.Id("p").Dot(srcName),
+			))
+			stmts = append(stmts, jen.If(jen.Err().Op("!=").Nil()).Block(jen.Return(jen.List(jen.Lit(0), jen.Err()))))
+			stmts = append(stmts, jen.Return(jen.List(jen.Id("t").Dot("UnixNano").Call(), jen.Nil())))
+		}
+	}
+
+	if len(stmts) == 0 {
+		return errors.New("version: numeric or timestamp type is required")
+	}
+
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id(key.name).Params().Parens(jen.List(jen.Int64(), jen.Error())).Block(stmts...).Line()
+
+	return nil
+}
+
 func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 	const stringBuffer = "sb"
 	for _, msg := range in.AllMessages() {
@@ -198,6 +245,10 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				key:  mext.Sort,
 				name: "SortKey",
 			},
+			{
+				key:  mext.Version,
+				name: "Version",
+			},
 		}
 
 		for _, ck := range mext.CompoundField {
@@ -212,6 +263,16 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			if key.key == nil {
 				continue
 			}
+
+			if key.name == "Version" {
+				err := m.applyVersionFuncs(msg, key, f)
+				if err != nil {
+					m.Logf("Generating version funcs failed: %s", err)
+					m.Fail("code generation failed")
+				}
+				continue
+			}
+
 			stmts := []jen.Code{}
 			if key.key.Const != "" {
 				stmts = append(stmts,

@@ -11,6 +11,8 @@ message Store {
   option (dynamo.msg).partition = {name: "pk", prefix: "store", fields: ["id", "country", "foo"]};
   option (dynamo.msg).sort = {name: "sk", const: "example"};
 
+  option (dynamo.msg).version = {fields: ["updated_at"]};
+
   option (dynamo.msg).compound_field = {name: "gsi1pk", prefix: "store", fields: ["id", "country", "foo"]};
   option (dynamo.msg).compound_field = {name: "gsi1sk", const: "dummyvalue"};
 
@@ -25,6 +27,8 @@ message Store {
                                              ];
   repeated string best_employee_ids = 8 [(dynamo.field).type.set = true];
   google.protobuf.Timestamp bin_date = 9;
+
+  google.protobuf.Timestamp updated_at = 10;
 
   uint64 foo = 99;
   repeated uint64 morefoo = 100 [(dynamo.field).type.set = true];
