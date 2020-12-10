@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/dave/jennifer/jen"
 	"github.com/davecgh/go-spew/spew"
@@ -72,6 +73,7 @@ const (
 	strconvPkg = "strconv"
 	stringsPkg = "strings"
 	fmtPkg     = "fmt"
+	timePkg    = "time"
 )
 
 func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
@@ -88,6 +90,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(strconvPkg, "strconv")
 	f.ImportName(fmtPkg, "fmt")
 	f.ImportName(stringsPkg, "strings")
+	f.ImportName(timePkg, "time")
 
 	// https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Marshaler
 	// https://godoc.org/github.com/guregu/dynamo#Marshaler
@@ -197,7 +200,7 @@ func (m *Module) applyVersionFuncs(msg pgs.Message, key namedKey, f *jen.File) e
 		stmts = append(stmts, jen.Return(jen.List(jen.Int64().Parens(jen.Id("p").Dot(srcName)), jen.Nil())))
 	} else {
 		d := field.Descriptor().TypeName
-		if d != nil && *d == ".google.protobuf.Timestamp" {
+		if d != nil && strings.HasSuffix(*d, "google.protobuf.Timestamp") {
 			// t, err := ptypes.Timestamp(p.<fieldName>)
 			// if err != nil { return 0, err }
 			// return t.UnixNano(), nil
@@ -481,7 +484,6 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			if fext.Type == nil {
 				fext.Type = &dynamopb.Types{}
 			}
-
 			pt := field.Type().ProtoType()
 
 			srcName := field.Name().UpperCamelCase().String()
@@ -497,7 +499,10 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			}
 
 			avt := getAVType(field, &fext)
-
+			fieldName := jen.Lit(field.Name().LowerSnakeCase().String())
+			if fext.Name != "" {
+				fieldName = jen.Lit(fext.Name)
+			}
 			switch avt {
 			case avt_bytes:
 				needNullBoolTrue = true
@@ -509,9 +514,9 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 						jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
 					),
 				)
-				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Id(vname)
+				d[fieldName] = jen.Id(vname)
 			case avt_bool:
-				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
 					jen.Id("BOOL"): jen.Op("&").Id("p").Dot(srcName),
 				})
 			case avt_list:
@@ -554,16 +559,43 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 				default:
 					m.Failf("Error: dynamo.field '%s' is repeated, but the '%s' type is not supported", field.FullyQualifiedName(), pt.String())
 				}
-				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
 					jen.Id("L"): jen.Id(arrname),
 				})
 			case avt_map:
-				// avt_map: impl
-				m.Failf("dynamo.field: not done: avt_map type: %s", field.FullyQualifiedName())
-				panic("applyMarshal not done: avt_map")
+				// if its a timestamp, keep going
+				fieldDescriptorName := field.Descriptor().TypeName
+				if fieldDescriptorName == nil || (fieldDescriptorName != nil && !strings.HasSuffix(*fieldDescriptorName, "google.protobuf.Timestamp")) {
+					m.Failf("dynamo.field: not done: avt_map type: %s / %s", field.FullyQualifiedName(), *field.Descriptor().TypeName)
+					panic("applyMarshal not done: avt_map for non-timestamps")
+				}
+				switch {
+				case fext.Type.UnixMilli, fext.Type.UnixNano, fext.Type.UnixSecond:
+					var access *jen.Statement
+					switch {
+					case fext.Type.UnixMilli:
+						// .Round(time.Millisecond).UnixNano() / time.Millisecond
+						access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
+							Dot("Round").Call(jen.Qual(timePkg, "Millisecond")).
+							Dot("UnixNano").Call().Op("/").Int64().Call(jen.Qual(timePkg, "Millisecond"))
+					case fext.Type.UnixNano:
+						access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().Dot("UnixNano").Call()
+					case fext.Type.UnixSecond:
+						access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
+							Dot("Round").Call(jen.Qual(timePkg, "Second")).
+							Dot("Unix").Call()
+					}
+					fmtCall := numberFormatStatement(pgs.Int64T, access)
+					d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+						jen.Id("N"): jen.Qual(awsPkg, "String").Call(fmtCall),
+					})
+				default:
+					m.Failf("dynamo.field: not done: applyMarshal not done: timestamps must specify the conversion type %s", field.FullyQualifiedName())
+					panic("applyMarshal not done: timestamps must specify the conversion type")
+				}
 			case avt_number:
 				fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
-				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
 					jen.Id("N"): jen.Qual(awsPkg, "String").Call(fmtCall),
 				})
 			case avt_null:
@@ -578,7 +610,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 						jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
 					),
 				)
-				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Id(vname)
+				d[fieldName] = jen.Id(vname)
 			case avt_string_set, avt_number_set, avt_byte_set:
 				arrT := jen.Op("[]*").Id("string")
 				if avt == avt_byte_set {
@@ -641,7 +673,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 						jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
 					),
 				)
-				d[jen.Lit(field.Name().LowerSnakeCase().String())] = jen.Id(vname)
+				d[fieldName] = jen.Id(vname)
 			}
 		}
 

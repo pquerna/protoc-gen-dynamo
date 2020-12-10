@@ -8,28 +8,62 @@ import "dynamo/dynamo.proto";
 import "google/protobuf/timestamp.proto";
 
 message Store {
-  option (dynamo.msg).partition = {name: "pk", prefix: "store", fields: ["id", "country", "foo"]};
-  option (dynamo.msg).sort = {name: "sk", const: "example"};
-
-  option (dynamo.msg).version = {fields: ["updated_at"]};
-
-  option (dynamo.msg).compound_field = {name: "gsi1pk", prefix: "store", fields: ["id", "country", "foo"]};
-  option (dynamo.msg).compound_field = {name: "gsi1sk", const: "dummyvalue"};
-
-  string id = 1 [(dynamo.field).name = "store_id", (dynamo.field).expose = true];
+  option (dynamo.msg).partition = {
+    name: "pk"
+    prefix: "store"
+    fields: [
+      "id",
+      "country",
+      "foo"
+    ]
+  };
+  option (dynamo.msg).sort = {
+    name: "sk"
+    const: "example"
+  };
+  option (dynamo.msg).version = {
+    fields: [
+      "updated_at"
+    ]
+  };
+  option (dynamo.msg).compound_field = {
+    name: "gsi1pk"
+    prefix: "store"
+    fields: [
+      "id",
+      "country",
+      "foo"
+    ]
+  };
+  option (dynamo.msg).compound_field = {
+    name: "gsi1sk"
+    const: "dummyvalue"
+  };
+  string id = 1 [
+    (dynamo.field).expose = true,
+    (dynamo.field).name = "store_id"
+  ];
   string country = 2;
   string region = 3;
   string state = 4;
   string city = 5;
   bool closed = 6;
-  google.protobuf.Timestamp opening_date = 7 [
-                                             (dynamo.field).type.unix_second = true
-                                             ];
+  google.protobuf.Timestamp opening_date = 7 [(dynamo.field).type.unix_second = true];
   repeated string best_employee_ids = 8 [(dynamo.field).type.set = true];
   google.protobuf.Timestamp bin_date = 9;
-
   google.protobuf.Timestamp updated_at = 10;
-
+  google.protobuf.Timestamp expires_at = 11 [
+    (dynamo.field).expose = true,
+    (dynamo.field).type.unix_second = true
+  ];
+  google.protobuf.Timestamp expires_at_ms = 12 [
+    (dynamo.field).expose = true,
+    (dynamo.field).type.unix_milli = true
+  ];
+  google.protobuf.Timestamp expires_at_ns = 13 [
+    (dynamo.field).expose = true,
+    (dynamo.field).type.unix_nano = true
+  ];
   uint64 foo = 99;
   repeated uint64 morefoo = 100 [(dynamo.field).type.set = true];
 }
