@@ -67,3 +67,44 @@ message Store {
   uint64 foo = 99;
   repeated uint64 morefoo = 100 [(dynamo.field).type.set = true];
 }
+
+message User {
+  option (dynamo.msg).partition = {
+    name: "pk"
+    prefix: "users"
+    fields: [
+      "tenant_id"
+    ]
+  };
+  option (dynamo.msg).sort = {
+    name: "sk"
+    fields: [
+      "id"
+    ]
+  };
+  option (dynamo.msg).version = {
+    fields: [
+      "updated_at"
+    ]
+  };
+  option (dynamo.msg).compound_field = {
+    name: "gsi1pk"
+    prefix: "users_by_idp"
+    fields: [
+      "tenant_id"
+    ]
+  };
+  option (dynamo.msg).compound_field = {
+    name: "gsi1sk"
+    fields: [
+      "idp_id"
+    ]
+  };
+  string tenant_id = 1;
+  string id = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  string idp_id = 5;
+  string display_name = 6;
+  string email = 7;
+}
