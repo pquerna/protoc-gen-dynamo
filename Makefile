@@ -12,7 +12,7 @@ generate:
 	dynamo/*.proto
 
 example:
-	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out="paths=source_relative:examplepb" --dynamo_out="lang=go,paths=source_relative:examplepb"
+	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out="plugins=grpc,paths=source_relative:examplepb" --dynamo_out="lang=go,paths=source_relative:examplepb"
 
 .PHONY: adddep
 adddep:

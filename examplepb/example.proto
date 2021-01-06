@@ -104,7 +104,8 @@ message User {
   string id = 2;
   google.protobuf.Timestamp created_at = 3;
   google.protobuf.Timestamp updated_at = 4;
-  string idp_id = 5;
-  string display_name = 6;
-  string email = 7;
+  google.protobuf.Timestamp deleted_at = 5;
+  string idp_id = 6;
+  string display_name = 7;
+  string email = 8;
 }
