@@ -356,8 +356,9 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, ck *dynamopb.Key, st
 }
 
 const (
-	valueField = "value"
-	typeField  = "typ"
+	valueField   = "value"
+	deletedField = "deleted"
+	typeField    = "typ"
 )
 
 func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
@@ -464,6 +465,19 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
 		stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Lit(typeName)))
 		d[jen.Lit(typeField)] = jen.Id(vname)
+
+		for _, field := range msg.Fields() {
+			fieldDescriptorName := field.Descriptor().GetTypeName()
+			if strings.HasSuffix(fieldDescriptorName, "google.protobuf.Timestamp") &&
+				field.Name().LowerSnakeCase().String() == "deleted_at" {
+				srcName := field.Name().UpperCamelCase().String()
+				refId++
+				vname = fmt.Sprintf("v%d", refId)
+				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+				stmts = append(stmts, jen.Id(vname).Dot("BOOL").Op("=").Qual(awsPkg, "Bool").Call(jen.Id("p").Dot(srcName).Dot("IsValid").Call()))
+				d[jen.Lit(deletedField)] = jen.Id(vname)
+			}
+		}
 
 		for _, field := range msg.Fields() {
 			fext := dynamopb.DynamoFieldOptions{}
