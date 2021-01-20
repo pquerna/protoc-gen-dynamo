@@ -343,7 +343,7 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, ck *dynamopb.Key, st
 			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				jen.Id("p").Dot(srcName),
 			))
-		case pt.IsNumeric():
+		case pt.IsNumeric() || pt == pgs.EnumT:
 			fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
 			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				fmtCall,
@@ -807,7 +807,7 @@ func numberFormatStatement(pt pgs.ProtoType, access *jen.Statement) *jen.Stateme
 			jen.Lit(-1),
 			jen.Lit(64),
 		)
-	case pgs.Int64T, pgs.SFixed64, pgs.SInt64, pgs.Int32T, pgs.SFixed32, pgs.SInt32:
+	case pgs.Int64T, pgs.SFixed64, pgs.SInt64, pgs.Int32T, pgs.SFixed32, pgs.SInt32, pgs.EnumT:
 		rv = jen.Qual(strconvPkg, "FormatInt").Call(
 			jen.Id("int64").Call(access),
 			jen.Lit(10),
