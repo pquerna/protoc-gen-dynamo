@@ -100,6 +100,13 @@ message User {
       "idp_id"
     ]
   };
+  option (dynamo.msg).compound_field = {
+    name: "gsi2sk"
+    fields: [
+      "idp_id",
+      "an_enum"
+    ]
+  };
   string tenant_id = 1;
   string id = 2;
   google.protobuf.Timestamp created_at = 3;
@@ -108,4 +115,10 @@ message User {
   string idp_id = 6;
   string display_name = 7;
   string email = 8;
+  BasicEnum an_enum = 9;
+}
+
+enum BasicEnum {
+  First = 0;
+  Second = 1;
 }
