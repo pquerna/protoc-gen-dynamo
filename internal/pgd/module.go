@@ -443,6 +443,21 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			}
 		}
 
+		if mext.Version != nil {
+			refId++
+			vname := fmt.Sprintf("v%d", refId)
+			// Version() (int64, error)
+			stmts = append(stmts, jen.List(jen.Id(vname), jen.Id("err")).Op(":=").Id("p").Dot("Version").Call())
+			stmts = append(stmts,
+				jen.If(jen.Id("err").Op("!=").Nil()).Block(
+					jen.Return(jen.Id("err")),
+				),
+			)
+			d[jen.Lit("version")] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				jen.Id("N"): jen.Qual(awsPkg, "String").Call(jen.Qual(strconvPkg, "FormatInt").Call(jen.Id(vname), jen.Lit(10))),
+			})
+		}
+
 		typeName := fmt.Sprintf("type.googleapis.com/%s.%s", msg.Package().ProtoName().String(), msg.Name())
 
 		needProtoBuffer = true
