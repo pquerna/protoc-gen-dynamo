@@ -69,11 +69,12 @@ const (
 	dynamoPkg  = "github.com/aws/aws-sdk-go/service/dynamodb"
 	protoPkg   = "github.com/golang/protobuf/proto"
 	awsPkg     = "github.com/aws/aws-sdk-go/aws"
-	ptypesPkg  = "github.com/golang/protobuf/ptypes"
 	strconvPkg = "strconv"
 	stringsPkg = "strings"
 	fmtPkg     = "fmt"
 	timePkg    = "time"
+
+	timestampType = "google.protobuf.Timestamp"
 )
 
 func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
@@ -200,15 +201,16 @@ func (m *Module) applyVersionFuncs(msg pgs.Message, key namedKey, f *jen.File) e
 		stmts = append(stmts, jen.Return(jen.List(jen.Int64().Parens(jen.Id("p").Dot(srcName)), jen.Nil())))
 	} else {
 		d := field.Descriptor().TypeName
-		if d != nil && strings.HasSuffix(*d, "google.protobuf.Timestamp") {
-			// t, err := ptypes.Timestamp(p.<fieldName>)
-			// if err != nil { return 0, err }
+		if d != nil && strings.HasSuffix(*d, timestampType) {
+			// 	err := p.UpdatedAt.CheckValid()
+			//	if err != nil {
+			//		return 0, err
+			//	}
+			//	t := p.UpdatedAt.AsTime()
 			// return t.UnixNano(), nil
-			f.ImportName(ptypesPkg, "ptypes")
-			stmts = append(stmts, jen.List(jen.Id("t"), jen.Id("err")).Op(":=").Qual(ptypesPkg, "Timestamp").Call(
-				jen.Id("p").Dot(srcName),
-			))
+			stmts = append(stmts, jen.List(jen.Err()).Op(":=").Id("p").Dot(srcName).Dot("CheckValid").Call())
 			stmts = append(stmts, jen.If(jen.Err().Op("!=").Nil()).Block(jen.Return(jen.List(jen.Lit(0), jen.Err()))))
+			stmts = append(stmts, jen.List(jen.Id("t")).Op(":=").Id("p").Dot(srcName).Dot("AsTime").Call())
 			stmts = append(stmts, jen.Return(jen.List(jen.Id("t").Dot("UnixNano").Call(), jen.Nil())))
 		}
 	}
@@ -458,7 +460,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			})
 		}
 
-		typeName := fmt.Sprintf("type.googleapis.com/%s.%s", msg.Package().ProtoName().String(), msg.Name())
+		typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
 
 		needProtoBuffer = true
 		needErr = true
@@ -483,7 +485,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 
 		for _, field := range msg.Fields() {
 			fieldDescriptorName := field.Descriptor().GetTypeName()
-			if strings.HasSuffix(fieldDescriptorName, "google.protobuf.Timestamp") &&
+			if strings.HasSuffix(fieldDescriptorName, timestampType) &&
 				field.Name().LowerSnakeCase().String() == "deleted_at" {
 				srcName := field.Name().UpperCamelCase().String()
 				refId++
@@ -594,7 +596,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			case avt_map:
 				// if its a timestamp, keep going
 				fieldDescriptorName := field.Descriptor().TypeName
-				if fieldDescriptorName == nil || (fieldDescriptorName != nil && !strings.HasSuffix(*fieldDescriptorName, "google.protobuf.Timestamp")) {
+				if fieldDescriptorName == nil || (fieldDescriptorName != nil && !strings.HasSuffix(*fieldDescriptorName, timestampType)) {
 					m.Failf("dynamo.field: not done: avt_map type: %s / %s", field.FullyQualifiedName(), *field.Descriptor().TypeName)
 					panic("applyMarshal not done: avt_map for non-timestamps")
 				}
