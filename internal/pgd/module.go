@@ -761,7 +761,7 @@ func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 
 		stmts := []jen.Code{}
 
-		typeName := fmt.Sprintf("type.googleapis.com/%s.%s", msg.Package().ProtoName().String(), msg.Name())
+		typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
 
 		stmts = append(stmts,
 			jen.List(jen.Id(typeField), jen.Id("ok")).Op(":=").Id("av").Dot("M").Index(jen.Lit(typeField)),
