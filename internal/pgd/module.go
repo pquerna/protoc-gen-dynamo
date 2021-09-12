@@ -333,7 +333,7 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, fields []string, str
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
 
 	sep := ":"
-	prefix := msg.Name().LowerSnakeCase().String()
+	prefix := fmt.Sprintf("%s_%s", msg.Package().ProtoName().LowerSnakeCase().String(), msg.Name().LowerSnakeCase().String())
 	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 		jen.Lit(prefix+sep),
 	))
