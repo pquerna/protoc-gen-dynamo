@@ -14,7 +14,7 @@ extend google.protobuf.MessageOptions {
 message DynamoMessageOptions {
   // Disables generation for this message
   bool disabled = 1;
-  // A compound value that can be used as a partition and sort key.
+  // A compound value that can be used as a partition and sort key. Multiple keys will be added as gsi keys after the first.
   repeated Key key = 2;
 }
 
@@ -23,8 +23,6 @@ message Key {
   repeated string sk_fields = 2;
   // If set, the value of sort key is set to a constant string.  In this case sk_fields is ignored.
   string sk_const = 3;
-  // If set generates gsi{N}pk/gsi{N}sk names instead of "pk" "sk" where {N} is the value of this field.
-  int32 global_secondary_index = 4;
 }
 
 extend google.protobuf.FieldOptions {

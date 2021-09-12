@@ -17,7 +17,6 @@ message Store {
     sk_const: "example"
   };
   option (dynamo.msg).key = {
-    global_secondary_index: 1
     pk_fields: [
       "id",
       "country",
@@ -64,7 +63,6 @@ message User {
     ]
   };
   option (dynamo.msg).key = {
-    global_secondary_index: 1
     pk_fields: [
       "tenant_id"
     ]
@@ -73,7 +71,6 @@ message User {
     ]
   };
   option (dynamo.msg).key = {
-    global_secondary_index: 2
     pk_fields: [
       "idp_id",
       "an_enum"

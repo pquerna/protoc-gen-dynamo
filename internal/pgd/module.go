@@ -247,16 +247,16 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 		keys := []namedKey{ }
 		// pk, sk, gsi1pk, gsi1sk
-		for _, ck := range mext.Key {
+		for i, ck := range mext.Key {
 
 			pkName := "PartitionKey"
-			if ck.GlobalSecondaryIndex != 0 {
-				pkName = fmt.Sprintf("Gsi%dPkKey", ck.GlobalSecondaryIndex)
+			if i != 0 {
+				pkName = fmt.Sprintf("Gsi%dPkKey", i)
 			}
 
 			skName := "SortKey"
-			if ck.GlobalSecondaryIndex != 0 {
-				skName = fmt.Sprintf("Gsi%dSkKey", ck.GlobalSecondaryIndex)
+			if i != 0 {
+				skName = fmt.Sprintf("Gsi%dSkKey", i)
 			}
 
 			keys = append(keys,
@@ -416,16 +416,16 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			m.Log(spew.Sprint(computedKeys))
 		}
 
-		for _, ck := range computedKeys {
+		for i, ck := range computedKeys {
 			needStringBuilder = true
 
 			pkName := "pk"
-			if ck.GlobalSecondaryIndex != 0 {
-				pkName = fmt.Sprintf("gsi%dpk", ck.GlobalSecondaryIndex)
+			if i != 0 {
+				pkName = fmt.Sprintf("gsi%dpk", i)
 			}
 			skName := "sk"
-			if ck.GlobalSecondaryIndex != 0 {
-				skName = fmt.Sprintf("gsi%dsk", ck.GlobalSecondaryIndex)
+			if i != 0 {
+				skName = fmt.Sprintf("gsi%dsk", i)
 			}
 
 			refId++
