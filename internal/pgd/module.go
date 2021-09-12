@@ -223,10 +223,6 @@ func (m *Module) applyVersionFuncs(msg pgs.Message, f *jen.File) error {
 	stmts = append(stmts, jen.List(jen.Id("t")).Op(":=").Id("p").Dot(srcName).Dot("AsTime").Call())
 	stmts = append(stmts, jen.Return(jen.List(jen.Id("t").Dot("UnixNano").Call(), jen.Nil())))
 
-	if len(stmts) == 0 {
-		return errors.New("version: numeric or timestamp type is required")
-	}
-
 	f.Func().Params(
 		jen.Id("p").Op("*").Id(structName.String()),
 	).Id("Version").Params().Parens(jen.List(jen.Int64(), jen.Error())).Block(stmts...).Line()
