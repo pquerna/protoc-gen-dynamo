@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/dave/jennifer/jen"
@@ -273,6 +272,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			keys = append(keys,
 				namedKey{
 					name: skName,
+					constant: ck.SkConst,
 					fields: ck.SkFields,
 				})
 		}
