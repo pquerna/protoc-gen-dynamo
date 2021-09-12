@@ -254,9 +254,9 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				pkName = fmt.Sprintf("Gsi%dPkKey", i)
 			}
 
-			skName := "SortKey"
-			if i != 0 {
-				skName = fmt.Sprintf("Gsi%dSkKey", i)
+			if len(ck.PkFields) == 0 {
+				m.Logf("Partition key %s must have at least one field", pkName)
+				m.Fail("code generation failed")
 			}
 
 			keys = append(keys,
@@ -264,6 +264,18 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 					name: pkName,
 					fields: ck.PkFields,
 				})
+
+
+			if len(ck.SkFields) == 0 && ck.SkConst == "" {
+				m.Logf("No sort key for key %s", pkName)
+				continue
+			}
+
+			skName := "SortKey"
+			if i != 0 {
+				skName = fmt.Sprintf("Gsi%dSkKey", i)
+			}
+
 
 			keys = append(keys,
 				namedKey{
