@@ -8,36 +8,22 @@ import "dynamo/dynamo.proto";
 import "google/protobuf/timestamp.proto";
 
 message Store {
-  option (dynamo.msg).partition = {
-    name: "pk"
-    prefix: "store"
-    fields: [
+  option (dynamo.msg).key = {
+    pk_fields: [
       "id",
       "country",
       "foo"
     ]
+    sk_const: "example"
   };
-  option (dynamo.msg).sort = {
-    name: "sk"
-    const: "example"
-  };
-  option (dynamo.msg).version = {
-    fields: [
-      "updated_at"
-    ]
-  };
-  option (dynamo.msg).compound_field = {
-    name: "gsi1pk"
-    prefix: "store"
-    fields: [
+  option (dynamo.msg).key = {
+    global_secondary_index: 1
+    pk_fields: [
       "id",
       "country",
       "foo"
     ]
-  };
-  option (dynamo.msg).compound_field = {
-    name: "gsi1sk"
-    const: "dummyvalue"
+    sk_const: "dummyvalue"
   };
   string id = 1 [
     (dynamo.field).expose = true,
@@ -69,40 +55,26 @@ message Store {
 }
 
 message User {
-  option (dynamo.msg).partition = {
-    name: "pk"
-    prefix: "users"
-    fields: [
+  option (dynamo.msg).key = {
+    pk_fields: [
       "tenant_id"
     ]
-  };
-  option (dynamo.msg).sort = {
-    name: "sk"
-    fields: [
+    sk_fields: [
       "id"
     ]
   };
-  option (dynamo.msg).version = {
-    fields: [
-      "updated_at"
-    ]
-  };
-  option (dynamo.msg).compound_field = {
-    name: "gsi1pk"
-    prefix: "users_by_idp"
-    fields: [
+  option (dynamo.msg).key = {
+    global_secondary_index: 1
+    pk_fields: [
       "tenant_id"
     ]
-  };
-  option (dynamo.msg).compound_field = {
-    name: "gsi1sk"
-    fields: [
+    sk_fields: [
       "idp_id"
     ]
   };
-  option (dynamo.msg).compound_field = {
-    name: "gsi2sk"
-    fields: [
+  option (dynamo.msg).key = {
+    global_secondary_index: 2
+    pk_fields: [
       "idp_id",
       "an_enum"
     ]
