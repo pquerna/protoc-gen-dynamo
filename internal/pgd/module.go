@@ -178,50 +178,54 @@ func fieldByName(msg pgs.Message, name string) pgs.Field {
 
 type namedKey struct {
 	name string
-	key  *dynamopb.Key
+	constant string
+	fields []string
 }
 
-func (m *Module) applyVersionFuncs(msg pgs.Message, key namedKey, f *jen.File) error {
-	if key.key.Const != "" {
-		return errors.New("version: constants not allowed")
+func getVersionField(msg pgs.Message) pgs.Field {
+	fn := "updated_at"
+	for _, f := range msg.Fields() {
+		if f.Name().LowerSnakeCase().String() == fn {
+			return f
+		}
 	}
+	return nil
+}
 
-	if len(key.key.Fields) != 1 {
-		return errors.New("version: exactly 1 field is required")
-	}
-
+func (m *Module) applyVersionFuncs(msg pgs.Message, f *jen.File) error {
 	structName := m.ctx.Name(msg)
-	fn := key.key.Fields[0]
-	field := fieldByName(msg, fn)
+
+	field := getVersionField(msg)
+	if field == nil {
+		// No version field, don't apply version func
+		return nil
+	}
+
+	fn := field.Name().String()
 	srcName := field.Name().UpperCamelCase().String()
 
 	var stmts []jen.Code
-	if field.Type().ProtoType().IsNumeric() {
-		// return int64(p.<fieldName>)
-		stmts = append(stmts, jen.Return(jen.List(jen.Int64().Parens(jen.Id("p").Dot(srcName)), jen.Nil())))
-	} else {
-		d := field.Descriptor().TypeName
-		if d != nil && strings.HasSuffix(*d, timestampType) {
-			// 	err := p.UpdatedAt.CheckValid()
-			//	if err != nil {
-			//		return 0, err
-			//	}
-			//	t := p.UpdatedAt.AsTime()
-			// return t.UnixNano(), nil
-			stmts = append(stmts, jen.List(jen.Err()).Op(":=").Id("p").Dot(srcName).Dot("CheckValid").Call())
-			stmts = append(stmts, jen.If(jen.Err().Op("!=").Nil()).Block(jen.Return(jen.List(jen.Lit(0), jen.Err()))))
-			stmts = append(stmts, jen.List(jen.Id("t")).Op(":=").Id("p").Dot(srcName).Dot("AsTime").Call())
-			stmts = append(stmts, jen.Return(jen.List(jen.Id("t").Dot("UnixNano").Call(), jen.Nil())))
-		}
+	d := field.Descriptor().TypeName
+	if d == nil {
+		return errors.New(fmt.Sprintf("Failed to find field descriptor for %s on %s", fn, msg.FullyQualifiedName()))
 	}
-
-	if len(stmts) == 0 {
-		return errors.New("version: numeric or timestamp type is required")
+	if !strings.HasSuffix(*d, timestampType) {
+		return errors.New(fmt.Sprintf("Field descriptor for %s on %s is not a timestamp", fn, msg.FullyQualifiedName()))
 	}
+	// 	err := p.UpdatedAt.CheckValid()
+	//	if err != nil {
+	//		return 0, err
+	//	}
+	//	t := p.UpdatedAt.AsTime()
+	// return t.UnixNano(), nil
+	stmts = append(stmts, jen.List(jen.Err()).Op(":=").Id("p").Dot(srcName).Dot("CheckValid").Call())
+	stmts = append(stmts, jen.If(jen.Err().Op("!=").Nil()).Block(jen.Return(jen.List(jen.Lit(0), jen.Err()))))
+	stmts = append(stmts, jen.List(jen.Id("t")).Op(":=").Id("p").Dot(srcName).Dot("AsTime").Call())
+	stmts = append(stmts, jen.Return(jen.List(jen.Id("t").Dot("UnixNano").Call(), jen.Nil())))
 
 	f.Func().Params(
 		jen.Id("p").Op("*").Id(structName.String()),
-	).Id(key.name).Params().Parens(jen.List(jen.Int64(), jen.Error())).Block(stmts...).Line()
+	).Id("Version").Params().Parens(jen.List(jen.Int64(), jen.Error())).Block(stmts...).Line()
 
 	return nil
 }
@@ -241,53 +245,62 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			continue
 		}
 
-		keys := []namedKey{
-			{
-				key:  mext.Partition,
-				name: "PartitionKey",
-			},
-			{
-				key:  mext.Sort,
-				name: "SortKey",
-			},
-			{
-				key:  mext.Version,
-				name: "Version",
-			},
-		}
+		keys := []namedKey{ }
+		// pk, sk, gsi1pk, gsi1sk
+		for i, ck := range mext.Key {
 
-		for _, ck := range mext.CompoundField {
+			pkName := "PartitionKey"
+			if i != 0 {
+				pkName = fmt.Sprintf("Gsi%dPkKey", i)
+			}
+
+			if len(ck.PkFields) == 0 {
+				m.Logf("Partition key %s must have at least one field", pkName)
+				m.Fail("code generation failed")
+			}
+
 			keys = append(keys,
 				namedKey{
-					name: pgs.Name(ck.Name).UpperCamelCase().String() + "Key",
-					key:  ck,
+					name: pkName,
+					fields: ck.PkFields,
+				})
+
+
+			if len(ck.SkFields) == 0 && ck.SkConst == "" {
+				m.Logf("No sort key for key %s", pkName)
+				continue
+			}
+
+			skName := "SortKey"
+			if i != 0 {
+				skName = fmt.Sprintf("Gsi%dSkKey", i)
+			}
+
+
+			keys = append(keys,
+				namedKey{
+					name: skName,
+					constant: ck.SkConst,
+					fields: ck.SkFields,
 				})
 		}
 
+		if err := m.applyVersionFuncs(msg, f); err != nil {
+			m.Logf("Generating version funcs failed: %s", err)
+			m.Fail("code generation failed")
+		}
+
 		for _, key := range keys {
-			if key.key == nil {
-				continue
-			}
-
-			if key.name == "Version" {
-				err := m.applyVersionFuncs(msg, key, f)
-				if err != nil {
-					m.Logf("Generating version funcs failed: %s", err)
-					m.Fail("code generation failed")
-				}
-				continue
-			}
-
 			stmts := []jen.Code{}
-			if key.key.Const != "" {
+			if key.constant != "" {
 				stmts = append(stmts,
-					jen.Return(jen.Lit(key.key.Const)),
+					jen.Return(jen.Lit(key.constant)),
 				)
 			} else {
 				stmts = append(stmts,
 					jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
 				)
-				stmts = generateKeyStringer(msg, stmts, key.key, stringBuffer)
+				stmts = generateKeyStringer(msg, stmts, key.fields, stringBuffer)
 				stmts = append(stmts,
 					jen.Return(jen.Id(stringBuffer).Dot("String").Call()),
 				)
@@ -301,7 +314,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 			params := []jen.Code{}
 			d := jen.Dict{}
-			for _, fn := range key.key.Fields {
+			for _, fn := range key.fields {
 				field := fieldByName(msg, fn)
 				typ := m.ctx.Type(field)
 				params = append(params, jen.Id(field.Name().LowerCamelCase().String()).Id(typ.String()))
@@ -316,21 +329,17 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 	return nil
 }
 
-func generateKeyStringer(msg pgs.Message, stmts []jen.Code, ck *dynamopb.Key, stringBuffer string) []jen.Code {
+func generateKeyStringer(msg pgs.Message, stmts []jen.Code, fields []string, stringBuffer string) []jen.Code {
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
 
-	sep := ck.Separator
-	if sep == "" {
-		sep = ":"
-	}
+	sep := ":"
+	prefix := fmt.Sprintf("%s_%s", msg.Package().ProtoName().LowerSnakeCase().String(), msg.Name().LowerSnakeCase().String())
+	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+		jen.Lit(prefix+sep),
+	))
 
-	if ck.Prefix != "" {
-		stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-			jen.Lit(ck.Prefix+sep),
-		))
-	}
 	first := true
-	for _, fn := range ck.Fields {
+	for _, fn := range fields {
 		field := fieldByName(msg, fn)
 		pt := field.Type().ProtoType()
 		srcName := field.Name().UpperCamelCase().String()
@@ -411,41 +420,50 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		const protoBuffer = "pbuf"
 		const stringBuffer = "sb"
 		computedKeys := make([]*dynamopb.Key, 0)
-		if mext.Partition != nil {
-			computedKeys = append(computedKeys, mext.Partition)
-		}
-		if mext.Sort != nil {
-			computedKeys = append(computedKeys, mext.Sort)
-		}
-		if mext.CompoundField != nil {
-			computedKeys = append(computedKeys, mext.CompoundField...)
+		if mext.Key != nil {
+			computedKeys = append(computedKeys, mext.Key...)
 		}
 
 		if false {
 			m.Log(spew.Sprint(computedKeys))
 		}
 
-		for _, ck := range computedKeys {
+		for i, ck := range computedKeys {
+			needStringBuilder = true
+
+			pkName := "pk"
+			if i != 0 {
+				pkName = fmt.Sprintf("gsi%dpk", i)
+			}
+			skName := "sk"
+			if i != 0 {
+				skName = fmt.Sprintf("gsi%dsk", i)
+			}
+
 			refId++
 			vname := fmt.Sprintf("v%d", refId)
-
-			if ck.Const != "" {
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			stmts = generateKeyStringer(msg, stmts, ck.PkFields, stringBuffer)
+			stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
+			d[jen.Lit(pkName)] = jen.Id(vname)
+			if ck.SkConst != "" {
+				refId++
+				vname = fmt.Sprintf("v%d", refId)
 				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-					jen.Id("S"): jen.Qual(awsPkg, "String").Call(jen.Lit(ck.Const)),
+					jen.Id("S"): jen.Qual(awsPkg, "String").Call(jen.Lit(ck.SkConst)),
 				}))
-				d[jen.Lit(ck.Name)] = jen.Id(vname)
+				d[jen.Lit(skName)] = jen.Id(vname)
 			} else {
-				needStringBuilder = true
+				refId++
+				vname = fmt.Sprintf("v%d", refId)
 				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-
-				stmts = generateKeyStringer(msg, stmts, ck, stringBuffer)
-
+				stmts = generateKeyStringer(msg, stmts, ck.SkFields, stringBuffer)
 				stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
-				d[jen.Lit(ck.Name)] = jen.Id(vname)
+				d[jen.Lit(skName)] = jen.Id(vname)
 			}
 		}
 
-		if mext.Version != nil {
+		if getVersionField(msg) != nil {
 			refId++
 			vname := fmt.Sprintf("v%d", refId)
 			// Version() (int64, error)

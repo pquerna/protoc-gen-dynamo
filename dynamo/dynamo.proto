@@ -14,24 +14,15 @@ extend google.protobuf.MessageOptions {
 message DynamoMessageOptions {
   // Disables generation for this message
   bool disabled = 1;
-  // A compound value that can be used as a Partition Key.
-  Key partition = 2;
-  // A compound value that can be used as a Sort Key.
-  Key sort = 3;
-  // A list of compound values that can be set from other fields.
-  repeated Key compound_field = 4;
-  // A value that can be used as a item version.
-  Key version = 5;
+  // A compound value that can be used as a partition and sort key. Multiple keys will be added as gsi keys after the first.
+  repeated Key key = 2;
 }
 
 message Key {
-  string name = 1;
-  repeated string fields = 2;
-  string prefix = 3;
-  // defaults to `:` if unset, only used if more than one field is set
-  string separator = 4;
-  // If set, the value of key is set to a constant string.  Fields, prefix, and separator are ignored.
-  string const = 5;
+  repeated string pk_fields = 1;
+  repeated string sk_fields = 2;
+  // If set, the value of sort key is set to a constant string.  In this case sk_fields is ignored.
+  string sk_const = 3;
 }
 
 extend google.protobuf.FieldOptions {
