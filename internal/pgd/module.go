@@ -178,6 +178,7 @@ func fieldByName(msg pgs.Message, name string) pgs.Field {
 
 type namedKey struct {
 	name string
+	prefix bool
 	constant string
 	fields []string
 }
@@ -263,6 +264,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				namedKey{
 					name: pkName,
 					fields: ck.PkFields,
+					prefix: true,
 				})
 
 
@@ -300,7 +302,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				stmts = append(stmts,
 					jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
 				)
-				stmts = generateKeyStringer(msg, stmts, key.fields, stringBuffer)
+				stmts = generateKeyStringer(msg, stmts, key.prefix, key.fields, stringBuffer)
 				stmts = append(stmts,
 					jen.Return(jen.Id(stringBuffer).Dot("String").Call()),
 				)
@@ -329,14 +331,16 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 	return nil
 }
 
-func generateKeyStringer(msg pgs.Message, stmts []jen.Code, fields []string, stringBuffer string) []jen.Code {
+func generateKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, fields []string, stringBuffer string) []jen.Code {
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
-
 	sep := ":"
-	prefix := fmt.Sprintf("%s_%s", msg.Package().ProtoName().LowerSnakeCase().String(), msg.Name().LowerSnakeCase().String())
-	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-		jen.Lit(prefix+sep),
-	))
+	prefix := ""
+	if addPrefix {
+		prefix = fmt.Sprintf("%s_%s", msg.Package().ProtoName().LowerSnakeCase().String(), msg.Name().LowerSnakeCase().String())
+		stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+			jen.Lit(prefix+sep),
+		))
+	}
 
 	first := true
 	for _, fn := range fields {
@@ -443,7 +447,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			refId++
 			vname := fmt.Sprintf("v%d", refId)
 			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-			stmts = generateKeyStringer(msg, stmts, ck.PkFields, stringBuffer)
+			stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
 			stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
 			d[jen.Lit(pkName)] = jen.Id(vname)
 			if ck.SkConst != "" {
@@ -457,7 +461,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 				refId++
 				vname = fmt.Sprintf("v%d", refId)
 				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-				stmts = generateKeyStringer(msg, stmts, ck.SkFields, stringBuffer)
+				stmts = generateKeyStringer(msg, stmts, false, ck.SkFields, stringBuffer)
 				stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
 				d[jen.Lit(skName)] = jen.Id(vname)
 			}
