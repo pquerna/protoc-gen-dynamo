@@ -10,7 +10,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	pgs "github.com/lyft/protoc-gen-star"
 	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
-	dynamopb "github.com/pquerna/protoc-gen-dynamo/dynamo"
+	dynamopb "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
 )
 
 const (
