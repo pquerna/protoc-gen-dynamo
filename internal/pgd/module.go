@@ -10,7 +10,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	pgs "github.com/lyft/protoc-gen-star"
 	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
-	dynamopb "github.com/pquerna/protoc-gen-dynamo/dynamo"
+	dynamopb "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
 )
 
 const (
@@ -177,10 +177,10 @@ func fieldByName(msg pgs.Message, name string) pgs.Field {
 }
 
 type namedKey struct {
-	name string
-	prefix bool
+	name     string
+	prefix   bool
 	constant string
-	fields []string
+	fields   []string
 }
 
 func getVersionField(msg pgs.Message) pgs.Field {
@@ -246,7 +246,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			continue
 		}
 
-		keys := []namedKey{ }
+		keys := []namedKey{}
 		// pk, sk, gsi1pk, gsi1sk
 		for i, ck := range mext.Key {
 
@@ -262,11 +262,10 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 			keys = append(keys,
 				namedKey{
-					name: pkName,
+					name:   pkName,
 					fields: ck.PkFields,
 					prefix: true,
 				})
-
 
 			if len(ck.SkFields) == 0 && ck.SkConst == "" {
 				m.Logf("No sort key for key %s", pkName)
@@ -278,12 +277,11 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				skName = fmt.Sprintf("Gsi%dSkKey", i)
 			}
 
-
 			keys = append(keys,
 				namedKey{
-					name: skName,
+					name:     skName,
 					constant: ck.SkConst,
-					fields: ck.SkFields,
+					fields:   ck.SkFields,
 				})
 		}
 

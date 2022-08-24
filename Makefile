@@ -5,14 +5,16 @@ MAKEFLAGS += --no-builtin-variables
 install:
 	go install -mod=vendor -v .
 
+.PHONY: generate
 generate:
 	protoc \
 	-I . \
-	--go_out="plugins=grpc,paths=source_relative:." \
-	dynamo/*.proto
+	--go_out="paths=source_relative:." \
+	--go-grpc_out="paths=source_relative:." \
+	dynamo/v1/*.proto
 
 example:
-	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out="plugins=grpc,paths=source_relative:examplepb" --dynamo_out="lang=go,paths=source_relative:examplepb"
+	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out="paths=source_relative:examplepb" --dynamo_out="lang=go,paths=source_relative:examplepb"
 
 .PHONY: adddep
 adddep:
