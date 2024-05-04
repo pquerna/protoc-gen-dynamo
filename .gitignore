@@ -1,3 +1,4 @@
 .idea
 examplepb/example.pb.dynamo.go
 examplepb/example.pb.go
+/build
