@@ -1,0 +1,9 @@
+version: v1
+plugins:
+  - name: go
+    out: example
+    opt: paths=source_relative
+  - name: dynamo
+    out: example
+    opt: paths=source_relative
+    path: ./build/protoc-gen-dynamo

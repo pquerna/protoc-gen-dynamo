@@ -1,20 +1,27 @@
 MAKEFLAGS += --no-builtin-rules
 MAKEFLAGS += --no-builtin-variables
 
-.PHONY: install
-install:
-	go install -mod=vendor -v .
+.PHONY: build
+build:
+	mkdir -p build
+	go build -mod=readonly -v -o build/ .
 
 .PHONY: generate
 generate:
-	protoc \
-	-I . \
-	--go_out="paths=source_relative:." \
-	--go-grpc_out="paths=source_relative:." \
-	dynamo/v1/*.proto
+	buf generate proto
 
-example:
-	DEBUG_PGD=true protoc example.proto --proto_path=. --proto_path=examplepb --go_out="paths=source_relative:examplepb" --dynamo_out="lang=go,paths=source_relative:examplepb"
+.PHONY: example
+example: build
+	buf --debug generate --template buf.example.gen.yaml --path examplepb/v1
+
+.PHONY: fmt
+fmt:
+	buf format -w 
+
+.PHONY: lint
+lint:
+	buf lint ./proto
+
 
 .PHONY: adddep
 adddep:

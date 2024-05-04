@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package examplepb.v1;
+
+import "dynamo/v1/dynamo.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/pquerna/protoc-gen-dynamo/examplepb/v1";
+
+message Store {
+  option (dynamo.v1.msg).key = {
+    pk_fields: [
+      "id",
+      "country",
+      "foo"
+    ]
+    sk_const: "example"
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: [
+      "id",
+      "country",
+      "foo"
+    ]
+    sk_const: "dummyvalue"
+  };
+  string id = 1 [
+    (dynamo.v1.field).expose = true,
+    (dynamo.v1.field).name = "store_id"
+  ];
+  string country = 2;
+  string region = 3;
+  string state = 4;
+  string city = 5;
+  bool closed = 6;
+  google.protobuf.Timestamp opening_date = 7 [(dynamo.v1.field).type.unix_second = true];
+  repeated string best_employee_ids = 8 [(dynamo.v1.field).type.set = true];
+  google.protobuf.Timestamp bin_date = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  google.protobuf.Timestamp expires_at = 11 [
+    (dynamo.v1.field).expose = true,
+    (dynamo.v1.field).type.unix_second = true
+  ];
+  google.protobuf.Timestamp expires_at_ms = 12 [
+    (dynamo.v1.field).expose = true,
+    (dynamo.v1.field).type.unix_milli = true
+  ];
+  google.protobuf.Timestamp expires_at_ns = 13 [
+    (dynamo.v1.field).expose = true,
+    (dynamo.v1.field).type.unix_nano = true
+  ];
+  uint64 foo = 99;
+  repeated uint64 morefoo = 100 [(dynamo.v1.field).type.set = true];
+}
+
+message User {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["idp_id"]
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: [
+      "idp_id",
+      "an_enum"
+    ]
+  };
+  string tenant_id = 1;
+  string id = 2;
+  google.protobuf.Timestamp created_at = 3;
+  google.protobuf.Timestamp updated_at = 4;
+  google.protobuf.Timestamp deleted_at = 5;
+  string idp_id = 6;
+  string display_name = 7;
+  string email = 8;
+  BasicEnum an_enum = 9;
+}
+
+enum BasicEnum {
+  First = 0;
+  Second = 1;
+}

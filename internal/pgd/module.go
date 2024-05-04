@@ -67,7 +67,7 @@ func (m *Module) processFile(f pgs.File) {
 
 const (
 	dynamoPkg  = "github.com/aws/aws-sdk-go/service/dynamodb"
-	protoPkg   = "github.com/golang/protobuf/proto"
+	protoPkg   = "google.golang.org/protobuf/proto"
 	awsPkg     = "github.com/aws/aws-sdk-go/aws"
 	strconvPkg = "strconv"
 	stringsPkg = "strings"
@@ -417,9 +417,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		d := jen.Dict{}
 		needErr := false
 		needNullBoolTrue := false
-		needProtoBuffer := false
 		needStringBuilder := false
-		const protoBuffer = "pbuf"
 		const stringBuffer = "sb"
 		computedKeys := make([]*dynamopb.Key, 0)
 		if mext.Key != nil {
@@ -482,19 +480,19 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 
 		typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
 
-		needProtoBuffer = true
 		needErr = true
 		refId++
 		vname := fmt.Sprintf("v%d", refId)
+		bufvname := fmt.Sprintf("v%dbuf", refId)
 		stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-		stmts = append(stmts, jen.Id(protoBuffer).Dot("Reset").Call())
-		stmts = append(stmts, jen.Id("err").Op("=").Id(protoBuffer).Dot("Marshal").Call(jen.Id("p")))
+
+		stmts = append(stmts, jen.List(jen.Id(bufvname), jen.Id("err")).Op(":=").Qual(protoPkg, "Marshal").Call(jen.Id("p")))
 		stmts = append(stmts,
 			jen.If(jen.Id("err").Op("!=").Nil()).Block(
 				jen.Return(jen.Id("err")),
 			),
 		)
-		stmts = append(stmts, jen.Id(vname).Dot("B").Op("=").Id(protoBuffer).Dot("Bytes").Call())
+		stmts = append(stmts, jen.Id(vname).Dot("B").Op("=").Id(bufvname))
 		d[jen.Lit(valueField)] = jen.Id(vname)
 
 		refId++
@@ -731,12 +729,6 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		if needNullBoolTrue {
 			stmts = append([]jen.Code{
 				jen.Id("nullBoolTrue").Op(":=").True(),
-			}, stmts...)
-		}
-
-		if needProtoBuffer {
-			stmts = append([]jen.Code{
-				jen.Id(protoBuffer).Op(":=").Qual(protoPkg, "NewBuffer").Call(jen.Nil()),
 			}, stmts...)
 		}
 
