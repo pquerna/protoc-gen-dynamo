@@ -5,6 +5,7 @@ package v1
 
 import (
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"google.golang.org/protobuf/proto"
@@ -167,6 +168,145 @@ func (p *User) MarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error 
 	return nil
 }
 
+func (p *StoreV2) MarshalDynamo() (types.AttributeValue, error) {
+	return p.MarshalDynamoDBAttributeValue()
+}
+
+func (p *StoreV2) MarshalDynamoItem() (map[string]types.AttributeValue, error) {
+	av, err := p.MarshalDynamoDBAttributeValue()
+	if err != nil {
+		return nil, err
+	}
+	avm, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return nil, fmt.Errorf("unable to marshal: expected type *types.AttributeValueMemberM, got %T", av)
+	}
+	return avm.Value, nil
+}
+
+func (p *StoreV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	var sb strings.Builder
+	var err error
+	nullBoolTrue := true
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_store_v_2:")
+	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	v1 := &types.AttributeValueMemberS{Value: sb.String()}
+	v2 := &types.AttributeValueMemberS{Value: "example"}
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_store_v_2:")
+	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	v3 := &types.AttributeValueMemberS{Value: sb.String()}
+	v4 := &types.AttributeValueMemberS{Value: "dummyvalue"}
+	v5, err := p.Version()
+	if err != nil {
+		return nil, err
+	}
+	v6buf, err := proto.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
+	v6 := &types.AttributeValueMemberB{Value: v6buf}
+	v7 := &types.AttributeValueMemberS{Value: "examplepb.v1.StoreV2"}
+	var v8 types.AttributeValue
+	if len(p.Id) != 0 {
+		v8 = &types.AttributeValueMemberS{Value: p.Id}
+	} else {
+		v8 = &types.AttributeValueMemberNULL{Value: nullBoolTrue}
+	}
+	var av types.AttributeValue
+	av = &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+		"expires_at":    &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAt.AsTime().Round(time.Second).Unix()), 10))},
+		"expires_at_ms": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAtMs.AsTime().Round(time.Millisecond).UnixNano()/int64(time.Millisecond)), 10))},
+		"expires_at_ns": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAtNs.AsTime().UnixNano()), 10))},
+		"gsi1pk":        v3,
+		"gsi1sk":        v4,
+		"pk":            v1,
+		"sk":            v2,
+		"store_id":      v8,
+		"typ":           v7,
+		"value":         v6,
+		"version":       &types.AttributeValueMemberN{Value: (strconv.FormatInt(v5, 10))},
+	}}
+	return av, nil
+}
+
+func (p *UserV2) MarshalDynamo() (types.AttributeValue, error) {
+	return p.MarshalDynamoDBAttributeValue()
+}
+
+func (p *UserV2) MarshalDynamoItem() (map[string]types.AttributeValue, error) {
+	av, err := p.MarshalDynamoDBAttributeValue()
+	if err != nil {
+		return nil, err
+	}
+	avm, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return nil, fmt.Errorf("unable to marshal: expected type *types.AttributeValueMemberM, got %T", av)
+	}
+	return avm.Value, nil
+}
+
+func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	var sb strings.Builder
+	var err error
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.TenantId)
+	v1 := &types.AttributeValueMemberS{Value: sb.String()}
+	sb.Reset()
+	_, _ = sb.WriteString(p.Id)
+	v2 := &types.AttributeValueMemberS{Value: sb.String()}
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.TenantId)
+	v3 := &types.AttributeValueMemberS{Value: sb.String()}
+	sb.Reset()
+	_, _ = sb.WriteString(p.IdpId)
+	v4 := &types.AttributeValueMemberS{Value: sb.String()}
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.AnEnum), 10))
+	v5 := &types.AttributeValueMemberS{Value: sb.String()}
+	sb.Reset()
+	v6 := &types.AttributeValueMemberS{Value: sb.String()}
+	v7, err := p.Version()
+	if err != nil {
+		return nil, err
+	}
+	v8buf, err := proto.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
+	v8 := &types.AttributeValueMemberB{Value: v8buf}
+	v9 := &types.AttributeValueMemberS{Value: "examplepb.v1.UserV2"}
+	v10 := &types.AttributeValueMemberBOOL{Value: p.DeletedAt.IsValid()}
+	var av types.AttributeValue
+	av = &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+		"deleted": v10,
+		"gsi1pk":  v3,
+		"gsi1sk":  v4,
+		"gsi2pk":  v5,
+		"gsi2sk":  v6,
+		"pk":      v1,
+		"sk":      v2,
+		"typ":     v9,
+		"value":   v8,
+		"version": &types.AttributeValueMemberN{Value: (strconv.FormatInt(v7, 10))},
+	}}
+	return av, nil
+}
+
 func (p *Store) UnmarshalDynamoDBAttributeValue(av *dynamodb.AttributeValue) error {
 	typ, ok := av.M["typ"]
 	if !ok {
@@ -211,6 +351,76 @@ func (p *User) UnmarshalDynamo(av *dynamodb.AttributeValue) error {
 
 func (p *User) UnmarshalDynamoItem(av map[string]*dynamodb.AttributeValue) error {
 	return p.UnmarshalDynamoDBAttributeValue(&dynamodb.AttributeValue{M: av})
+}
+
+func (p *StoreV2) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	m, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberM, got %T", av)
+	}
+	typ, ok := m.Value["typ"]
+	if !ok {
+		return fmt.Errorf("dynamo: typ missing")
+	}
+	t, ok := typ.(*types.AttributeValueMemberS)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberS, got %T", typ)
+	}
+	if t.Value != "examplepb.v1.StoreV2" {
+		return fmt.Errorf("dynamo: _type mismatch: examplepb.v1.StoreV2 expected, got: '%s'", typ)
+	}
+	value, ok := m.Value["value"]
+	if !ok {
+		return fmt.Errorf("dynamo: value missing")
+	}
+	v, ok := value.(*types.AttributeValueMemberB)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
+	}
+	return proto.Unmarshal(v.Value, p)
+}
+
+func (p *StoreV2) UnmarshalDynamo(av types.AttributeValue) error {
+	return p.UnmarshalDynamoDBAttributeValue(av)
+}
+
+func (p *StoreV2) UnmarshalDynamoItem(av map[string]types.AttributeValue) error {
+	return p.UnmarshalDynamoDBAttributeValue(&types.AttributeValueMemberM{Value: av})
+}
+
+func (p *UserV2) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	m, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberM, got %T", av)
+	}
+	typ, ok := m.Value["typ"]
+	if !ok {
+		return fmt.Errorf("dynamo: typ missing")
+	}
+	t, ok := typ.(*types.AttributeValueMemberS)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberS, got %T", typ)
+	}
+	if t.Value != "examplepb.v1.UserV2" {
+		return fmt.Errorf("dynamo: _type mismatch: examplepb.v1.UserV2 expected, got: '%s'", typ)
+	}
+	value, ok := m.Value["value"]
+	if !ok {
+		return fmt.Errorf("dynamo: value missing")
+	}
+	v, ok := value.(*types.AttributeValueMemberB)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
+	}
+	return proto.Unmarshal(v.Value, p)
+}
+
+func (p *UserV2) UnmarshalDynamo(av types.AttributeValue) error {
+	return p.UnmarshalDynamoDBAttributeValue(av)
+}
+
+func (p *UserV2) UnmarshalDynamoItem(av map[string]types.AttributeValue) error {
+	return p.UnmarshalDynamoDBAttributeValue(&types.AttributeValueMemberM{Value: av})
 }
 
 func (p *Store) Version() (int64, error) {
@@ -345,6 +555,143 @@ func (p *User) Gsi2PkKey() string {
 
 func UserGsi2PkKey(idpId string, anEnum BasicEnum) string {
 	return (&User{
+		AnEnum: anEnum,
+		IdpId:  idpId,
+	}).Gsi2PkKey()
+}
+
+func (p *StoreV2) Version() (int64, error) {
+	err := p.UpdatedAt.CheckValid()
+	if err != nil {
+		return 0, err
+	}
+	t := p.UpdatedAt.AsTime()
+	return t.UnixNano(), nil
+}
+
+func (p *StoreV2) PartitionKey() string {
+	var sb strings.Builder
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_store_v_2:")
+	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	return sb.String()
+}
+
+func StoreV2PartitionKey(id string, country string, foo uint64) string {
+	return (&StoreV2{
+		Country: country,
+		Foo:     foo,
+		Id:      id,
+	}).PartitionKey()
+}
+
+func (p *StoreV2) SortKey() string {
+	return "example"
+}
+
+func StoreV2SortKey() string {
+	return (&StoreV2{}).SortKey()
+}
+
+func (p *StoreV2) Gsi1PkKey() string {
+	var sb strings.Builder
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_store_v_2:")
+	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	return sb.String()
+}
+
+func StoreV2Gsi1PkKey(id string, country string, foo uint64) string {
+	return (&StoreV2{
+		Country: country,
+		Foo:     foo,
+		Id:      id,
+	}).Gsi1PkKey()
+}
+
+func (p *StoreV2) Gsi1SkKey() string {
+	return "dummyvalue"
+}
+
+func StoreV2Gsi1SkKey() string {
+	return (&StoreV2{}).Gsi1SkKey()
+}
+
+func (p *UserV2) Version() (int64, error) {
+	err := p.UpdatedAt.CheckValid()
+	if err != nil {
+		return 0, err
+	}
+	t := p.UpdatedAt.AsTime()
+	return t.UnixNano(), nil
+}
+
+func (p *UserV2) PartitionKey() string {
+	var sb strings.Builder
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.TenantId)
+	return sb.String()
+}
+
+func UserV2PartitionKey(tenantId string) string {
+	return (&UserV2{TenantId: tenantId}).PartitionKey()
+}
+
+func (p *UserV2) SortKey() string {
+	var sb strings.Builder
+	sb.Reset()
+	_, _ = sb.WriteString(p.Id)
+	return sb.String()
+}
+
+func UserV2SortKey(id string) string {
+	return (&UserV2{Id: id}).SortKey()
+}
+
+func (p *UserV2) Gsi1PkKey() string {
+	var sb strings.Builder
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.TenantId)
+	return sb.String()
+}
+
+func UserV2Gsi1PkKey(tenantId string) string {
+	return (&UserV2{TenantId: tenantId}).Gsi1PkKey()
+}
+
+func (p *UserV2) Gsi1SkKey() string {
+	var sb strings.Builder
+	sb.Reset()
+	_, _ = sb.WriteString(p.IdpId)
+	return sb.String()
+}
+
+func UserV2Gsi1SkKey(idpId string) string {
+	return (&UserV2{IdpId: idpId}).Gsi1SkKey()
+}
+
+func (p *UserV2) Gsi2PkKey() string {
+	var sb strings.Builder
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.AnEnum), 10))
+	return sb.String()
+}
+
+func UserV2Gsi2PkKey(idpId string, anEnum BasicEnum) string {
+	return (&UserV2{
 		AnEnum: anEnum,
 		IdpId:  idpId,
 	}).Gsi2PkKey()
