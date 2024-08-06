@@ -10,6 +10,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	pgs "github.com/lyft/protoc-gen-star"
 	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
+
 	dynamopb "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
 )
 
@@ -66,13 +67,14 @@ func (m *Module) processFile(f pgs.File) {
 }
 
 const (
-	dynamoPkg  = "github.com/aws/aws-sdk-go/service/dynamodb"
-	protoPkg   = "google.golang.org/protobuf/proto"
-	awsPkg     = "github.com/aws/aws-sdk-go/aws"
-	strconvPkg = "strconv"
-	stringsPkg = "strings"
-	fmtPkg     = "fmt"
-	timePkg    = "time"
+	dynamoPkg   = "github.com/aws/aws-sdk-go/service/dynamodb"
+	dynamoV2Pkg = "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	protoPkg    = "google.golang.org/protobuf/proto"
+	awsPkg      = "github.com/aws/aws-sdk-go/aws"
+	strconvPkg  = "strconv"
+	stringsPkg  = "strings"
+	fmtPkg      = "fmt"
+	timePkg     = "time"
 
 	timestampType = "google.protobuf.Timestamp"
 )
@@ -86,6 +88,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.HeaderComment(fmt.Sprintf(commentFormat, moduleName, version, protoFileName))
 
 	f.ImportName(dynamoPkg, "dynamodb")
+	f.ImportName(dynamoV2Pkg, "types")
 	f.ImportName(awsPkg, "aws")
 	f.ImportName(protoPkg, "proto")
 	f.ImportName(strconvPkg, "strconv")
@@ -93,15 +96,11 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(stringsPkg, "strings")
 	f.ImportName(timePkg, "time")
 
-	// https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Marshaler
-	// https://godoc.org/github.com/guregu/dynamo#Marshaler
 	err := m.applyMarshal(f, in)
 	if err != nil {
 		return err
 	}
 
-	// https://godoc.org/github.com/guregu/dynamo#Unmarshaler
-	// UnmarshalDynamo(av *dynamodb.AttributeValue) error
 	err = m.applyUnmarshal(f, in)
 	if err != nil {
 		return err
@@ -232,7 +231,6 @@ func (m *Module) applyVersionFuncs(msg pgs.Message, f *jen.File) error {
 }
 
 func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
-	const stringBuffer = "sb"
 	for _, msg := range in.AllMessages() {
 		structName := m.ctx.Name(msg)
 		mext := dynamopb.DynamoMessageOptions{}
@@ -246,7 +244,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			continue
 		}
 
-		keys := []namedKey{}
+		var keys []namedKey
 		// pk, sk, gsi1pk, gsi1sk
 		for i, ck := range mext.Key {
 
@@ -291,7 +289,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 		}
 
 		for _, key := range keys {
-			stmts := []jen.Code{}
+			var stmts []jen.Code
 			if key.constant != "" {
 				stmts = append(stmts,
 					jen.Return(jen.Lit(key.constant)),
@@ -312,7 +310,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				stmts...,
 			).Line()
 
-			params := []jen.Code{}
+			var params []jen.Code
 			d := jen.Dict{}
 			for _, fn := range key.fields {
 				field := fieldByName(msg, fn)
@@ -376,7 +374,6 @@ const (
 
 func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 	for _, msg := range in.AllMessages() {
-		structName := m.ctx.Name(msg)
 		mext := dynamopb.DynamoMessageOptions{}
 		ok, err := msg.Extension(dynamopb.E_Msg, &mext)
 		if err != nil {
@@ -384,444 +381,478 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			m.Fail("code generation failed")
 		}
 		if ok && mext.Disabled {
-			m.Logf("dynamo.msg disabled for %s", structName)
+			m.Logf("dynamo.msg disabled for %s", m.ctx.Name(msg))
 			continue
 		}
+		if mext.UseV2Sdk {
+			// https://pkg.go.dev/github.com/guregu/dynamo/v2#Marshaler
+			// https://pkg.go.dev/github.com/guregu/dynamo/v2#ItemMarshaler
+			err = m.applyMarshalMsgV2(f, msg, &mext)
+		} else {
+			// https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Marshaler
+			// https://godoc.org/github.com/guregu/dynamo#Marshaler
+			err = m.applyMarshalMsgV1(f, msg, &mext)
+		}
+		if err != nil {
+			return err
+		}
+	}
 
-		// https://godoc.org/github.com/guregu/dynamo#Marshaler:
-		// MarshalDynamo() (*dynamodb.AttributeValue, error)
-		f.Func().Params(
-			jen.Id("p").Op("*").Id(structName.String()),
-		).Id("MarshalDynamo").Params().List(jen.Params(jen.Op("*").Qual(dynamoPkg, "AttributeValue"), jen.Id("error"))).Block(
-			jen.Id("av").Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(),
-			jen.Id("err").Op(":=").Id("p").Dot("MarshalDynamoDBAttributeValue").Call(jen.Id("av")),
-			jen.If(jen.Id("err").Op("!=").Nil()).Block(
-				jen.Return(jen.Nil(), jen.Id("err")),
-			),
-			jen.Return(jen.Id("av"), jen.Nil()),
-		).Line()
+	return nil
+}
 
-		f.Func().Params(
-			jen.Id("p").Op("*").Id(structName.String()),
-		).Id("MarshalDynamoItem").Params().List(jen.Params(jen.Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue"), jen.Id("error"))).Block(
-			jen.Id("av").Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(),
-			jen.Id("err").Op(":=").Id("p").Dot("MarshalDynamoDBAttributeValue").Call(jen.Id("av")),
-			jen.If(jen.Id("err").Op("!=").Nil()).Block(
-				jen.Return(jen.Nil(), jen.Id("err")),
-			),
-			jen.Return(jen.Id("av").Dot("M"), jen.Nil()),
-		).Line()
+func (m *Module) applyMarshalMsgV1(f *jen.File, msg pgs.Message, mext *dynamopb.DynamoMessageOptions) error {
+	structName := m.ctx.Name(msg)
 
-		stmts := []jen.Code{}
-		refId := 0
-		d := jen.Dict{}
-		needErr := false
-		needNullBoolTrue := false
-		needStringBuilder := false
-		const stringBuffer = "sb"
-		computedKeys := make([]*dynamopb.Key, 0)
-		if mext.Key != nil {
-			computedKeys = append(computedKeys, mext.Key...)
+	// https://godoc.org/github.com/guregu/dynamo#Marshaler:
+	// MarshalDynamo() (*dynamodb.AttributeValue, error)
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("MarshalDynamo").Params().List(jen.Params(jen.Op("*").Qual(dynamoPkg, "AttributeValue"), jen.Id("error"))).Block(
+		jen.Id("av").Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(),
+		jen.Id("err").Op(":=").Id("p").Dot("MarshalDynamoDBAttributeValue").Call(jen.Id("av")),
+		jen.If(jen.Id("err").Op("!=").Nil()).Block(
+			jen.Return(jen.Nil(), jen.Id("err")),
+		),
+		jen.Return(jen.Id("av"), jen.Nil()),
+	).Line()
+
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("MarshalDynamoItem").Params().List(jen.Params(jen.Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue"), jen.Id("error"))).Block(
+		jen.Id("av").Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(),
+		jen.Id("err").Op(":=").Id("p").Dot("MarshalDynamoDBAttributeValue").Call(jen.Id("av")),
+		jen.If(jen.Id("err").Op("!=").Nil()).Block(
+			jen.Return(jen.Nil(), jen.Id("err")),
+		),
+		jen.Return(jen.Id("av").Dot("M"), jen.Nil()),
+	).Line()
+
+	stmts := []jen.Code{}
+	refId := 0
+	d := jen.Dict{}
+	needErr := false
+	needNullBoolTrue := false
+	needStringBuilder := false
+	computedKeys := make([]*dynamopb.Key, 0)
+	if mext.Key != nil {
+		computedKeys = append(computedKeys, mext.Key...)
+	}
+
+	if false {
+		m.Log(spew.Sprint(computedKeys))
+	}
+
+	for i, ck := range computedKeys {
+		needStringBuilder = true
+
+		pkName := "pk"
+		if i != 0 {
+			pkName = fmt.Sprintf("gsi%dpk", i)
+		}
+		skName := "sk"
+		if i != 0 {
+			skName = fmt.Sprintf("gsi%dsk", i)
 		}
 
-		if false {
-			m.Log(spew.Sprint(computedKeys))
-		}
-
-		for i, ck := range computedKeys {
-			needStringBuilder = true
-
-			pkName := "pk"
-			if i != 0 {
-				pkName = fmt.Sprintf("gsi%dpk", i)
-			}
-			skName := "sk"
-			if i != 0 {
-				skName = fmt.Sprintf("gsi%dsk", i)
-			}
-
-			refId++
-			vname := fmt.Sprintf("v%d", refId)
-			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-			stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
-			stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
-			d[jen.Lit(pkName)] = jen.Id(vname)
-			if ck.SkConst != "" {
-				refId++
-				vname = fmt.Sprintf("v%d", refId)
-				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-					jen.Id("S"): jen.Qual(awsPkg, "String").Call(jen.Lit(ck.SkConst)),
-				}))
-				d[jen.Lit(skName)] = jen.Id(vname)
-			} else {
-				refId++
-				vname = fmt.Sprintf("v%d", refId)
-				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-				stmts = generateKeyStringer(msg, stmts, false, ck.SkFields, stringBuffer)
-				stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
-				d[jen.Lit(skName)] = jen.Id(vname)
-			}
-		}
-
-		if getVersionField(msg) != nil {
-			refId++
-			vname := fmt.Sprintf("v%d", refId)
-			// Version() (int64, error)
-			stmts = append(stmts, jen.List(jen.Id(vname), jen.Id("err")).Op(":=").Id("p").Dot("Version").Call())
-			stmts = append(stmts,
-				jen.If(jen.Id("err").Op("!=").Nil()).Block(
-					jen.Return(jen.Id("err")),
-				),
-			)
-			d[jen.Lit("version")] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-				jen.Id("N"): jen.Qual(awsPkg, "String").Call(jen.Qual(strconvPkg, "FormatInt").Call(jen.Id(vname), jen.Lit(10))),
-			})
-		}
-
-		typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
-
-		needErr = true
 		refId++
 		vname := fmt.Sprintf("v%d", refId)
-		bufvname := fmt.Sprintf("v%dbuf", refId)
 		stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+		stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
+		stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
+		d[jen.Lit(pkName)] = jen.Id(vname)
+		if ck.SkConst != "" {
+			refId++
+			vname = fmt.Sprintf("v%d", refId)
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				jen.Id("S"): jen.Qual(awsPkg, "String").Call(jen.Lit(ck.SkConst)),
+			}))
+			d[jen.Lit(skName)] = jen.Id(vname)
+		} else {
+			refId++
+			vname = fmt.Sprintf("v%d", refId)
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			stmts = generateKeyStringer(msg, stmts, false, ck.SkFields, stringBuffer)
+			stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id(stringBuffer).Dot("String").Call()))
+			d[jen.Lit(skName)] = jen.Id(vname)
+		}
+	}
 
-		stmts = append(stmts, jen.List(jen.Id(bufvname), jen.Id("err")).Op(":=").Qual(protoPkg, "Marshal").Call(jen.Id("p")))
+	if getVersionField(msg) != nil {
+		refId++
+		vname := fmt.Sprintf("v%d", refId)
+		// Version() (int64, error)
+		stmts = append(stmts, jen.List(jen.Id(vname), jen.Id("err")).Op(":=").Id("p").Dot("Version").Call())
 		stmts = append(stmts,
 			jen.If(jen.Id("err").Op("!=").Nil()).Block(
 				jen.Return(jen.Id("err")),
 			),
 		)
-		stmts = append(stmts, jen.Id(vname).Dot("B").Op("=").Id(bufvname))
-		d[jen.Lit(valueField)] = jen.Id(vname)
+		d[jen.Lit("version")] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+			jen.Id("N"): jen.Qual(awsPkg, "String").Call(jen.Qual(strconvPkg, "FormatInt").Call(jen.Id(vname), jen.Lit(10))),
+		})
+	}
 
-		refId++
-		vname = fmt.Sprintf("v%d", refId)
-		stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-		stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Lit(typeName)))
-		d[jen.Lit(typeField)] = jen.Id(vname)
+	typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
 
-		for _, field := range msg.Fields() {
-			fieldDescriptorName := field.Descriptor().GetTypeName()
-			if strings.HasSuffix(fieldDescriptorName, timestampType) &&
-				field.Name().LowerSnakeCase().String() == "deleted_at" {
-				srcName := field.Name().UpperCamelCase().String()
-				refId++
-				vname = fmt.Sprintf("v%d", refId)
-				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
-				stmts = append(stmts, jen.Id(vname).Dot("BOOL").Op("=").Qual(awsPkg, "Bool").Call(jen.Id("p").Dot(srcName).Dot("IsValid").Call()))
-				d[jen.Lit(deletedField)] = jen.Id(vname)
-			}
-		}
+	needErr = true
+	refId++
+	vname := fmt.Sprintf("v%d", refId)
+	bufvname := fmt.Sprintf("v%dbuf", refId)
+	stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
 
-		for _, field := range msg.Fields() {
-			fext := dynamopb.DynamoFieldOptions{}
-			ok, err := field.Extension(dynamopb.E_Field, &fext)
-			if err != nil {
-				m.Failf("Error: Parsing dynamo.field failed for '%s': %s", field.FullyQualifiedName(), err)
-			}
+	stmts = append(stmts, jen.List(jen.Id(bufvname), jen.Id("err")).Op(":=").Qual(protoPkg, "Marshal").Call(jen.Id("p")))
+	stmts = append(stmts,
+		jen.If(jen.Id("err").Op("!=").Nil()).Block(
+			jen.Return(jen.Id("err")),
+		),
+	)
+	stmts = append(stmts, jen.Id(vname).Dot("B").Op("=").Id(bufvname))
+	d[jen.Lit(valueField)] = jen.Id(vname)
 
-			if !ok {
-				m.Debugf("dynamo.field.expose: skipped %s (no extension)", field.FullyQualifiedName())
-				continue
-			}
-			if !fext.Expose {
-				m.Debugf("dynamo.field.expose: skipped %s (not exposed)", field.FullyQualifiedName())
-				continue
-			}
+	refId++
+	vname = fmt.Sprintf("v%d", refId)
+	stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+	stmts = append(stmts, jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Lit(typeName)))
+	d[jen.Lit(typeField)] = jen.Id(vname)
 
-			if fext.Type == nil {
-				fext.Type = &dynamopb.Types{}
-			}
-			pt := field.Type().ProtoType()
-
+	for _, field := range msg.Fields() {
+		fieldDescriptorName := field.Descriptor().GetTypeName()
+		if strings.HasSuffix(fieldDescriptorName, timestampType) &&
+			field.Name().LowerSnakeCase().String() == "deleted_at" {
 			srcName := field.Name().UpperCamelCase().String()
 			refId++
-			vname := fmt.Sprintf("v%d", refId)
-			arrix := fmt.Sprintf("ix%d", refId)
-			arrname := fmt.Sprintf("arr%d", refId)
+			vname = fmt.Sprintf("v%d", refId)
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			stmts = append(stmts, jen.Id(vname).Dot("BOOL").Op("=").Qual(awsPkg, "Bool").Call(jen.Id("p").Dot(srcName).Dot("IsValid").Call()))
+			d[jen.Lit(deletedField)] = jen.Id(vname)
+		}
+	}
 
-			isArray := field.Type().ProtoLabel() == pgs.Repeated
-			if fext.Type.Set && !isArray {
-				m.Failf("Error: dynamo.field.set=true, but field is not repeated / array type: '%s'.IsRepeated=%v",
-					field.FullyQualifiedName(), field.Type().IsRepeated())
-			}
+	for _, field := range msg.Fields() {
+		fext := dynamopb.DynamoFieldOptions{}
+		ok, err := field.Extension(dynamopb.E_Field, &fext)
+		if err != nil {
+			m.Failf("Error: Parsing dynamo.field failed for '%s': %s", field.FullyQualifiedName(), err)
+		}
 
-			avt := getAVType(field, &fext)
-			fieldName := jen.Lit(field.Name().LowerSnakeCase().String())
-			if fext.Name != "" {
-				fieldName = jen.Lit(fext.Name)
-			}
-			switch avt {
-			case avt_bytes:
-				needNullBoolTrue = true
-				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+		if !ok {
+			m.Debugf("dynamo.field.expose: skipped %s (no extension)", field.FullyQualifiedName())
+			continue
+		}
+		if !fext.Expose {
+			m.Debugf("dynamo.field.expose: skipped %s (not exposed)", field.FullyQualifiedName())
+			continue
+		}
+
+		if fext.Type == nil {
+			fext.Type = &dynamopb.Types{}
+		}
+		pt := field.Type().ProtoType()
+
+		srcName := field.Name().UpperCamelCase().String()
+		refId++
+		vname := fmt.Sprintf("v%d", refId)
+		arrix := fmt.Sprintf("ix%d", refId)
+		arrname := fmt.Sprintf("arr%d", refId)
+
+		isArray := field.Type().ProtoLabel() == pgs.Repeated
+		if fext.Type.Set && !isArray {
+			m.Failf("Error: dynamo.field.set=true, but field is not repeated / array type: '%s'.IsRepeated=%v",
+				field.FullyQualifiedName(), field.Type().IsRepeated())
+		}
+
+		avt := getAVType(field, &fext)
+		fieldName := jen.Lit(field.Name().LowerSnakeCase().String())
+		if fext.Name != "" {
+			fieldName = jen.Lit(fext.Name)
+		}
+		switch avt {
+		case avt_bytes:
+			needNullBoolTrue = true
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			stmts = append(stmts,
+				jen.If(jen.Len(jen.Id("p").Dot(field.Name().UpperCamelCase().String())).Op("!=").Lit(0)).Block(
+					jen.Id(vname).Dot("B").Op("=").Id("p").Dot(srcName),
+				).Else().Block(
+					jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
+				),
+			)
+			d[fieldName] = jen.Id(vname)
+		case avt_bool:
+			d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				jen.Id("BOOL"): jen.Op("&").Id("p").Dot(srcName),
+			})
+		case avt_list:
+			stmts = append(stmts,
+				jen.Id(arrname).Op(":=").Make(
+					jen.Op("[]*").Qual(dynamoPkg, "AttributeValue"),
+					jen.Lit(0),
+					jen.Len(jen.Id("p").Dot(srcName)),
+				),
+			)
+
+			switch {
+			case pt.IsInt() || pt == pgs.DoubleT || pt == pgs.FloatT:
+				fmtCall := numberFormatStatement(pt, jen.Id(arrix))
 				stmts = append(stmts,
-					jen.If(jen.Len(jen.Id("p").Dot(field.Name().UpperCamelCase().String())).Op("!=").Lit(0)).Block(
-						jen.Id(vname).Dot("B").Op("=").Id("p").Dot(srcName),
-					).Else().Block(
-						jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrname).Op("=").Append(
+							jen.Id(arrname),
+							jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+								jen.Id("N"): jen.Qual(awsPkg, "String").Call(
+									fmtCall,
+								),
+							}),
+						),
 					),
 				)
-				d[fieldName] = jen.Id(vname)
-			case avt_bool:
-				d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-					jen.Id("BOOL"): jen.Op("&").Id("p").Dot(srcName),
-				})
-			case avt_list:
+			case pt == pgs.StringT:
 				stmts = append(stmts,
-					jen.Id(arrname).Op(":=").Make(
-						jen.Op("[]*").Qual(dynamoPkg, "AttributeValue"),
-						jen.Lit(0),
-						jen.Len(jen.Id("p").Dot(srcName)),
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrname).Op("=").Append(
+							jen.Id(arrname),
+							jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+								jen.Id("S"): jen.Qual(awsPkg, "String").Call(
+									jen.Id(arrix),
+								),
+							}),
+						),
 					),
 				)
-
+			default:
+				m.Failf("Error: dynamo.field '%s' is repeated, but the '%s' type is not supported", field.FullyQualifiedName(), pt.String())
+			}
+			d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				jen.Id("L"): jen.Id(arrname),
+			})
+		case avt_map:
+			// if its a timestamp, keep going
+			fieldDescriptorName := field.Descriptor().TypeName
+			if fieldDescriptorName == nil || (fieldDescriptorName != nil && !strings.HasSuffix(*fieldDescriptorName, timestampType)) {
+				m.Failf("dynamo.field: not done: avt_map type: %s / %s", field.FullyQualifiedName(), *field.Descriptor().TypeName)
+				panic("applyMarshalMsgV1 not done: avt_map for non-timestamps")
+			}
+			switch {
+			case fext.Type.UnixMilli, fext.Type.UnixNano, fext.Type.UnixSecond:
+				var access *jen.Statement
 				switch {
-				case pt.IsInt() || pt == pgs.DoubleT || pt == pgs.FloatT:
-					fmtCall := numberFormatStatement(pt, jen.Id(arrix))
-					stmts = append(stmts,
-						jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
-							jen.Id(arrname).Op("=").Append(
-								jen.Id(arrname),
-								jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-									jen.Id("N"): jen.Qual(awsPkg, "String").Call(
-										fmtCall,
-									),
-								}),
-							),
-						),
-					)
-				case pt == pgs.StringT:
-					stmts = append(stmts,
-						jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
-							jen.Id(arrname).Op("=").Append(
-								jen.Id(arrname),
-								jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-									jen.Id("S"): jen.Qual(awsPkg, "String").Call(
-										jen.Id(arrix),
-									),
-								}),
-							),
-						),
-					)
-				default:
-					m.Failf("Error: dynamo.field '%s' is repeated, but the '%s' type is not supported", field.FullyQualifiedName(), pt.String())
+				case fext.Type.UnixMilli:
+					// .Round(time.Millisecond).UnixNano() / time.Millisecond
+					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
+						Dot("Round").Call(jen.Qual(timePkg, "Millisecond")).
+						Dot("UnixNano").Call().Op("/").Int64().Call(jen.Qual(timePkg, "Millisecond"))
+				case fext.Type.UnixNano:
+					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().Dot("UnixNano").Call()
+				case fext.Type.UnixSecond:
+					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
+						Dot("Round").Call(jen.Qual(timePkg, "Second")).
+						Dot("Unix").Call()
 				}
-				d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-					jen.Id("L"): jen.Id(arrname),
-				})
-			case avt_map:
-				// if its a timestamp, keep going
-				fieldDescriptorName := field.Descriptor().TypeName
-				if fieldDescriptorName == nil || (fieldDescriptorName != nil && !strings.HasSuffix(*fieldDescriptorName, timestampType)) {
-					m.Failf("dynamo.field: not done: avt_map type: %s / %s", field.FullyQualifiedName(), *field.Descriptor().TypeName)
-					panic("applyMarshal not done: avt_map for non-timestamps")
-				}
-				switch {
-				case fext.Type.UnixMilli, fext.Type.UnixNano, fext.Type.UnixSecond:
-					var access *jen.Statement
-					switch {
-					case fext.Type.UnixMilli:
-						// .Round(time.Millisecond).UnixNano() / time.Millisecond
-						access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
-							Dot("Round").Call(jen.Qual(timePkg, "Millisecond")).
-							Dot("UnixNano").Call().Op("/").Int64().Call(jen.Qual(timePkg, "Millisecond"))
-					case fext.Type.UnixNano:
-						access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().Dot("UnixNano").Call()
-					case fext.Type.UnixSecond:
-						access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
-							Dot("Round").Call(jen.Qual(timePkg, "Second")).
-							Dot("Unix").Call()
-					}
-					fmtCall := numberFormatStatement(pgs.Int64T, access)
-					d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-						jen.Id("N"): jen.Qual(awsPkg, "String").Call(fmtCall),
-					})
-				default:
-					m.Failf("dynamo.field: not done: applyMarshal not done: timestamps must specify the conversion type %s", field.FullyQualifiedName())
-					panic("applyMarshal not done: timestamps must specify the conversion type")
-				}
-			case avt_number:
-				fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
+				fmtCall := numberFormatStatement(pgs.Int64T, access)
 				d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
 					jen.Id("N"): jen.Qual(awsPkg, "String").Call(fmtCall),
 				})
-			case avt_null:
-				// avt_null: unused
-			case avt_string:
-				needNullBoolTrue = true
-				stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			default:
+				m.Failf("dynamo.field: not done: applyMarshalMsgV1 not done: timestamps must specify the conversion type %s", field.FullyQualifiedName())
+				panic("applyMarshalMsgV1 not done: timestamps must specify the conversion type")
+			}
+		case avt_number:
+			fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
+			d[fieldName] = jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				jen.Id("N"): jen.Qual(awsPkg, "String").Call(fmtCall),
+			})
+		case avt_null:
+			// avt_null: unused
+		case avt_string:
+			needNullBoolTrue = true
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoPkg, "AttributeValue").Values())
+			stmts = append(stmts,
+				jen.If(jen.Len(jen.Id("p").Dot(field.Name().UpperCamelCase().String())).Op("!=").Lit(0)).Block(
+					jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id("p").Dot(srcName)),
+				).Else().Block(
+					jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
+				),
+			)
+			d[fieldName] = jen.Id(vname)
+		case avt_string_set, avt_number_set, avt_byte_set:
+			arrT := jen.Op("[]*").Id("string")
+			if avt == avt_byte_set {
+				arrT = jen.Op("[][]").Id("byte")
+			}
+			stmts = append(stmts,
+				jen.Id(arrname).Op(":=").Make(
+					arrT,
+					jen.Lit(0),
+					jen.Len(jen.Id("p").Dot(srcName)),
+				),
+			)
+			needNullBoolTrue = true
+			setType := ""
+			switch avt {
+			case avt_number_set:
+				setType = "NS"
+				fmtCall := numberFormatStatement(pt, jen.Id(arrix))
 				stmts = append(stmts,
-					jen.If(jen.Len(jen.Id("p").Dot(field.Name().UpperCamelCase().String())).Op("!=").Lit(0)).Block(
-						jen.Id(vname).Dot("S").Op("=").Qual(awsPkg, "String").Call(jen.Id("p").Dot(srcName)),
-					).Else().Block(
-						jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
-					),
-				)
-				d[fieldName] = jen.Id(vname)
-			case avt_string_set, avt_number_set, avt_byte_set:
-				arrT := jen.Op("[]*").Id("string")
-				if avt == avt_byte_set {
-					arrT = jen.Op("[][]").Id("byte")
-				}
-				stmts = append(stmts,
-					jen.Id(arrname).Op(":=").Make(
-						arrT,
-						jen.Lit(0),
-						jen.Len(jen.Id("p").Dot(srcName)),
-					),
-				)
-				needNullBoolTrue = true
-				setType := ""
-				switch avt {
-				case avt_number_set:
-					setType = "NS"
-					fmtCall := numberFormatStatement(pt, jen.Id(arrix))
-					stmts = append(stmts,
-						jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
-							jen.Id(arrname).Op("=").Append(
-								jen.Id(arrname),
-								jen.Qual(awsPkg, "String").Call(
-									fmtCall,
-								),
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrname).Op("=").Append(
+							jen.Id(arrname),
+							jen.Qual(awsPkg, "String").Call(
+								fmtCall,
 							),
 						),
-					)
-				case avt_string_set:
-					setType = "SS"
-					stmts = append(stmts,
-						jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
-							jen.Id(arrname).Op("=").Append(
-								jen.Id(arrname),
-								jen.Qual(awsPkg, "String").Call(
-									jen.Id(arrix),
-								),
-							),
-						),
-					)
-				case avt_byte_set:
-					setType = "BS"
-					stmts = append(stmts,
-						jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
-							jen.Id(arrname).Op("=").Append(
-								jen.Id(arrname),
+					),
+				)
+			case avt_string_set:
+				setType = "SS"
+				stmts = append(stmts,
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrname).Op("=").Append(
+							jen.Id(arrname),
+							jen.Qual(awsPkg, "String").Call(
 								jen.Id(arrix),
 							),
 						),
-					)
-				}
-
-				stmts = append(stmts,
-					jen.Var().Id(vname).Op("*").Qual(dynamoPkg, "AttributeValue"),
-					jen.If(jen.Len(jen.Id(arrname)).Op("!=").Lit(0)).Block(
-						jen.Id(vname).Op("=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-							jen.Id(setType): jen.Id(arrname),
-						}),
-					).Else().Block(
-						jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
 					),
 				)
-				d[fieldName] = jen.Id(vname)
+			case avt_byte_set:
+				setType = "BS"
+				stmts = append(stmts,
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrname).Op("=").Append(
+							jen.Id(arrname),
+							jen.Id(arrix),
+						),
+					),
+				)
 			}
+
+			stmts = append(stmts,
+				jen.Var().Id(vname).Op("*").Qual(dynamoPkg, "AttributeValue"),
+				jen.If(jen.Len(jen.Id(arrname)).Op("!=").Lit(0)).Block(
+					jen.Id(vname).Op("=").Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+						jen.Id(setType): jen.Id(arrname),
+					}),
+				).Else().Block(
+					jen.Id(vname).Dot("NULL").Op("=").Op("&").Id("nullBoolTrue"),
+				),
+			)
+			d[fieldName] = jen.Id(vname)
 		}
-
-		if needNullBoolTrue {
-			stmts = append([]jen.Code{
-				jen.Id("nullBoolTrue").Op(":=").True(),
-			}, stmts...)
-		}
-
-		if needErr {
-			stmts = append([]jen.Code{
-				jen.Op("var").Id("err").Id("error"),
-			}, stmts...)
-		}
-
-		if needStringBuilder {
-			stmts = append([]jen.Code{
-				jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
-			}, stmts...)
-		}
-
-		stmts = append(stmts, jen.Id("av").Dot("M").Op("=").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue").Values(d))
-
-		stmts = append(stmts, jen.Return(jen.Nil()))
-
-		f.Func().Params(
-			jen.Id("p").Op("*").Id(structName.String()),
-		).Id("MarshalDynamoDBAttributeValue").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
-			stmts...,
-		).Line()
 	}
+
+	if needNullBoolTrue {
+		stmts = append([]jen.Code{
+			jen.Id("nullBoolTrue").Op(":=").True(),
+		}, stmts...)
+	}
+
+	if needErr {
+		stmts = append([]jen.Code{
+			jen.Op("var").Id("err").Id("error"),
+		}, stmts...)
+	}
+
+	if needStringBuilder {
+		stmts = append([]jen.Code{
+			jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+		}, stmts...)
+	}
+
+	stmts = append(stmts, jen.Id("av").Dot("M").Op("=").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue").Values(d))
+
+	stmts = append(stmts, jen.Return(jen.Nil()))
+
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("MarshalDynamoDBAttributeValue").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
+		stmts...,
+	).Line()
 	return nil
 }
 
 func (m *Module) applyUnmarshal(f *jen.File, in pgs.File) error {
 	for _, msg := range in.AllMessages() {
-		structName := m.ctx.Name(msg)
 		mext := dynamopb.DynamoMessageOptions{}
 		ok, err := msg.Extension(dynamopb.E_Msg, &mext)
 		if err != nil {
-			m.Logf("Parsing dynamo.msg failed: %s", err)
+			m.Logf("Parsing dynamo.msg.disabled failed: %s", err)
 			m.Fail("code generation failed")
 		}
 		if ok && mext.Disabled {
-			m.Logf("dynamo.msg disabled for %s", structName)
+			m.Logf("dynamo.msg disabled for %s", m.ctx.Name(msg))
 			continue
 		}
-
-		stmts := []jen.Code{}
-
-		typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
-
-		stmts = append(stmts,
-			jen.List(jen.Id(typeField), jen.Id("ok")).Op(":=").Id("av").Dot("M").Index(jen.Lit(typeField)),
-			jen.If(jen.Op("!").Id("ok")).Block(
-				jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
-					jen.Lit("dyanmo: "+typeField+" missing"),
-				),
-				)),
-			jen.If(jen.Qual(awsPkg, "StringValue").Call(jen.Id(typeField).Dot("S")).Op("!=").Lit(typeName)).Block(
-				jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
-					jen.Lit(fmt.Sprintf("dyanmo: _type mismatch: %s expected, got: '%s'", typeName, "%s")),
-					jen.Id(typeField),
-				),
-				)),
-		)
-
-		stmts = append(stmts,
-			jen.List(jen.Id(valueField), jen.Id("ok")).Op(":=").Id("av").Dot("M").Index(jen.Lit(valueField)),
-			jen.If(jen.Op("!").Id("ok")).Block(
-				jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
-					jen.Lit("dyanmo: "+valueField+" missing"),
-				),
-				)),
-			jen.Return(jen.Qual(protoPkg, "Unmarshal").Call(jen.Id(valueField).Dot("B"), jen.Id("p"))),
-		)
-
-		f.Func().Params(
-			jen.Id("p").Op("*").Id(structName.String()),
-		).Id("UnmarshalDynamoDBAttributeValue").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
-			stmts...,
-		).Line()
-
-		f.Func().Params(
-			jen.Id("p").Op("*").Id(structName.String()),
-		).Id("UnmarshalDynamo").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
-			jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(jen.Id("av"))),
-		).Line()
-
-		f.Func().Params(
-			jen.Id("p").Op("*").Id(structName.String()),
-		).Id("UnmarshalDynamoItem").Params(jen.Id("av").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
-			jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(
-				jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
-					jen.Id("M"): jen.Id("av"),
-				}),
-			)),
-		).Line()
+		if mext.UseV2Sdk {
+			// https://pkg.go.dev/github.com/guregu/dynamo/v2#Unmarshaler
+			// https://pkg.go.dev/github.com/guregu/dynamo/v2#ItemUnmarshaler
+			err = m.applyUnmarshalMsgV2(f, msg)
+		} else {
+			// https://godoc.org/github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute#Unmarshaler
+			// https://godoc.org/github.com/guregu/dynamo#Unmarshaler
+			err = m.applyUnmarshalMsgV1(f, msg)
+		}
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
+}
+
+func (m *Module) applyUnmarshalMsgV1(f *jen.File, msg pgs.Message) error {
+	structName := m.ctx.Name(msg)
+
+	var stmts []jen.Code
+
+	typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
+
+	stmts = append(stmts,
+		jen.List(jen.Id(typeField), jen.Id("ok")).Op(":=").Id("av").Dot("M").Index(jen.Lit(typeField)),
+		jen.If(jen.Op("!").Id("ok")).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit("dyanmo: "+typeField+" missing"),
+			),
+			)),
+		jen.If(jen.Qual(awsPkg, "StringValue").Call(jen.Id(typeField).Dot("S")).Op("!=").Lit(typeName)).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit(fmt.Sprintf("dyanmo: _type mismatch: %s expected, got: '%s'", typeName, "%s")),
+				jen.Id(typeField),
+			),
+			)),
+	)
+
+	stmts = append(stmts,
+		jen.List(jen.Id(valueField), jen.Id("ok")).Op(":=").Id("av").Dot("M").Index(jen.Lit(valueField)),
+		jen.If(jen.Op("!").Id("ok")).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit("dyanmo: "+valueField+" missing"),
+			),
+			)),
+		jen.Return(jen.Qual(protoPkg, "Unmarshal").Call(jen.Id(valueField).Dot("B"), jen.Id("p"))),
+	)
+
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("UnmarshalDynamoDBAttributeValue").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
+		stmts...,
+	).Line()
+
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("UnmarshalDynamo").Params(jen.Id("av").Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
+		jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(jen.Id("av"))),
+	).Line()
+
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("UnmarshalDynamoItem").Params(jen.Id("av").Map(jen.String()).Op("*").Qual(dynamoPkg, "AttributeValue")).Id("error").Block(
+		jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(
+			jen.Op("&").Qual(dynamoPkg, "AttributeValue").Values(jen.Dict{
+				jen.Id("M"): jen.Id("av"),
+			}),
+		)),
+	).Line()
 
 	return nil
 }
@@ -872,4 +903,438 @@ func numberParseStatement(pt pgs.ProtoType, access *jen.Statement) *jen.Statemen
 		)
 	}
 	return rv
+}
+
+const (
+	stringBuffer = "sb"
+)
+
+func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.DynamoMessageOptions) error {
+	structName := m.ctx.Name(msg)
+
+	// https://pkg.go.dev/github.com/guregu/dynamo/v2#Marshaler
+	// MarshalDynamo() (types.AttributeValue, error)
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("MarshalDynamo").Params().List(jen.Params(jen.Qual(dynamoV2Pkg, "AttributeValue"), jen.Id("error"))).Block(
+		jen.Return(jen.Id("p").Dot("MarshalDynamoDBAttributeValue").Call()),
+	).Line()
+
+	// https://pkg.go.dev/github.com/guregu/dynamo/v2#ItemMarshaler
+	// MarshalDynamoItem() (map[string]types.AttributeValue, error)
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("MarshalDynamoItem").Params().List(jen.Params(jen.Map(jen.String()).Qual(dynamoV2Pkg, "AttributeValue"), jen.Id("error"))).Block(
+		jen.List(jen.Id("av"), jen.Id("err")).Op(":=").Id("p").Dot("MarshalDynamoDBAttributeValue").Call(),
+		jen.If(jen.Id("err").Op("!=").Nil()).Block(
+			jen.Return(jen.Nil(), jen.Id("err")),
+		),
+		jen.List(jen.Id("avm"), jen.Id("ok")).Op(":=").Id("av").Assert(jen.Op("*").Qual(dynamoV2Pkg, "AttributeValueMemberM")),
+		jen.If(jen.Op("!").Id("ok")).Block(
+			jen.Return(jen.Nil(), jen.Qual(fmtPkg, "Errorf").Call(jen.Lit("unable to marshal: expected type *types.AttributeValueMemberM, got %T"), jen.Id("av"))),
+		),
+		jen.Return(jen.Id("avm").Dot("Value"), jen.Nil()),
+	).Line()
+
+	var (
+		stmts             []jen.Code
+		refId             int
+		needErr           bool
+		needNullBoolTrue  bool
+		needStringBuilder bool
+	)
+	d := jen.Dict{}
+
+	computedKeys := make([]*dynamopb.Key, 0)
+	if mext.Key != nil {
+		computedKeys = append(computedKeys, mext.Key...)
+	}
+
+	for i, ck := range computedKeys {
+		needStringBuilder = true
+
+		pkName := "pk"
+		if i != 0 {
+			pkName = fmt.Sprintf("gsi%dpk", i)
+		}
+		skName := "sk"
+		if i != 0 {
+			skName = fmt.Sprintf("gsi%dsk", i)
+		}
+		refId++
+		vname := fmt.Sprintf("v%d", refId)
+		stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
+		stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
+			jen.Id("Value"): jen.Id(stringBuffer).Dot("String").Call(),
+		}))
+		d[jen.Lit(pkName)] = jen.Id(vname)
+		refId++
+		vname = fmt.Sprintf("v%d", refId)
+		if ck.SkConst != "" {
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
+				jen.Id("Value"): jen.Lit(ck.SkConst),
+			}))
+			d[jen.Lit(skName)] = jen.Id(vname)
+		} else {
+			stmts = generateKeyStringer(msg, stmts, false, ck.SkFields, stringBuffer)
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
+				jen.Id("Value"): jen.Id(stringBuffer).Dot("String").Call(),
+			}))
+			d[jen.Lit(skName)] = jen.Id(vname)
+		}
+	}
+
+	if getVersionField(msg) != nil {
+		refId++
+		vname := fmt.Sprintf("v%d", refId)
+		// Version() (int64, error)
+		stmts = append(stmts, jen.List(jen.Id(vname), jen.Id("err")).Op(":=").Id("p").Dot("Version").Call())
+		stmts = append(stmts,
+			jen.If(jen.Id("err").Op("!=").Nil()).Block(
+				jen.Return(jen.Nil(), jen.Id("err")),
+			),
+		)
+		d[jen.Lit("version")] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberN").Values(jen.Dict{
+			jen.Id("Value"): jen.Call(jen.Qual(strconvPkg, "FormatInt").Call(jen.Id(vname), jen.Lit(10))),
+		})
+	}
+
+	needErr = true
+	refId++
+	valVarName := fmt.Sprintf("v%d", refId)
+	bufVName := fmt.Sprintf("v%dbuf", refId)
+
+	stmts = append(stmts, jen.List(jen.Id(bufVName), jen.Id("err")).Op(":=").Qual(protoPkg, "Marshal").Call(jen.Id("p")))
+	stmts = append(stmts,
+		jen.If(jen.Id("err").Op("!=").Nil()).Block(
+			jen.Return(jen.Nil(), jen.Id("err")),
+		),
+	)
+	stmts = append(stmts, jen.Id(valVarName).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberB").Values(jen.Dict{
+		jen.Id("Value"): jen.Id(bufVName),
+	}))
+	d[jen.Lit(valueField)] = jen.Id(valVarName)
+
+	refId++
+	typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
+	typeVarName := fmt.Sprintf("v%d", refId)
+	stmts = append(stmts, jen.Id(typeVarName).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
+		jen.Id("Value"): jen.Lit(typeName),
+	}))
+	d[jen.Lit(typeField)] = jen.Id(typeVarName)
+
+	for _, field := range msg.Fields() {
+		fieldDescriptorName := field.Descriptor().GetTypeName()
+		if strings.HasSuffix(fieldDescriptorName, timestampType) &&
+			field.Name().LowerSnakeCase().String() == "deleted_at" {
+			srcName := field.Name().UpperCamelCase().String()
+			refId++
+			vname := fmt.Sprintf("v%d", refId)
+			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberBOOL").Values(jen.Dict{
+				jen.Id("Value"): jen.Id("p").Dot(srcName).Dot("IsValid").Call(),
+			}))
+			d[jen.Lit(deletedField)] = jen.Id(vname)
+		}
+	}
+
+	for _, field := range msg.Fields() {
+		fext := dynamopb.DynamoFieldOptions{}
+		ok, err := field.Extension(dynamopb.E_Field, &fext)
+		if err != nil {
+			m.Failf("Error: Parsing dynamo.field failed for '%s': %s", field.FullyQualifiedName(), err)
+		}
+		if !ok {
+			m.Debugf("dynamo.field.expose: skipped %s (no extension)", field.FullyQualifiedName())
+			continue
+		}
+		if !fext.Expose {
+			m.Debugf("dynamo.field.expose: skipped %s (not exposed)", field.FullyQualifiedName())
+			continue
+		}
+
+		if fext.Type == nil {
+			fext.Type = &dynamopb.Types{}
+		}
+		pt := field.Type().ProtoType()
+
+		srcName := field.Name().UpperCamelCase().String()
+		refId++
+		vname := fmt.Sprintf("v%d", refId)
+		arrix := fmt.Sprintf("ix%d", refId)
+		arrName := fmt.Sprintf("arr%d", refId)
+
+		isArray := field.Type().ProtoLabel() == pgs.Repeated
+		if fext.Type.Set && !isArray {
+			m.Failf("Error: dynamo.field.set=true, but field is not repeated / array type: '%s'.IsRepeated=%v",
+				field.FullyQualifiedName(), field.Type().IsRepeated())
+		}
+
+		avt := getAVType(field, &fext)
+		fieldName := jen.Lit(field.Name().LowerSnakeCase().String())
+		if fext.Name != "" {
+			fieldName = jen.Lit(fext.Name)
+		}
+
+		switch avt {
+		case avt_bytes:
+			needNullBoolTrue = true
+			stmts = append(stmts,
+				jen.If(jen.Len(jen.Id("p").Dot(field.Name().UpperCamelCase().String()).Op("!=").Lit(0)).Block(
+					jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberB").Values(jen.Dict{jen.Id("Value"): jen.Id("p").Dot(srcName)}),
+				).Else().Block(
+					jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberNULL").Values(jen.Dict{jen.Id("Value"): jen.Id("nullBoolTrue")}),
+				)),
+			)
+			d[fieldName] = jen.Id(vname)
+		case avt_bool:
+			d[fieldName] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberBOOL").Values(jen.Dict{jen.Id("Value"): jen.Id("p").Dot(srcName)})
+		case avt_list:
+			stmts = append(stmts,
+				jen.Id(arrName).Op(":=").Make(
+					jen.Op("[]").Qual(dynamoV2Pkg, "AttributeValue"),
+					jen.Lit(0),
+					jen.Len(jen.Id("p").Dot(srcName)),
+				),
+			)
+
+			switch {
+			case pt.IsInt() || pt == pgs.DoubleT || pt == pgs.FloatT:
+				fmtCall := numberFormatStatement(pt, jen.Id(arrix))
+				stmts = append(stmts,
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrName).Op("=").Append(
+							jen.Id(arrName),
+							jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberN").Values(jen.Dict{
+								jen.Id("Value"): jen.Call(
+									fmtCall,
+								),
+							}),
+						),
+					),
+				)
+			case pt == pgs.StringT:
+				stmts = append(stmts,
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrName).Op("=").Append(
+							jen.Id(arrName),
+							jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
+								jen.Id("Value"): jen.Id(arrix),
+							}),
+						),
+					),
+				)
+			default:
+				m.Failf("Error: dynamo.field '%s' is repeated, but the '%s' type is not supported", field.FullyQualifiedName(), pt.String())
+			}
+			d[fieldName] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberL").Values(jen.Dict{
+				jen.Id("Value"): jen.Id(arrName),
+			})
+		case avt_map:
+			fieldDescriptorName := field.Descriptor().TypeName
+			if fieldDescriptorName == nil || (fieldDescriptorName != nil && !strings.HasSuffix(*fieldDescriptorName, timestampType)) {
+				m.Failf("dynamo.field: not done: avt_map type: %s / %s", field.FullyQualifiedName(), *field.Descriptor().TypeName)
+				panic("applyMarshalMsgV1 not done: avt_map for non-timestamps")
+			}
+			switch {
+			case fext.Type.UnixMilli, fext.Type.UnixNano, fext.Type.UnixSecond:
+				var access *jen.Statement
+				switch {
+				case fext.Type.UnixMilli:
+					// .Round(time.Millisecond).UnixNano() / time.Millisecond
+					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
+						Dot("Round").Call(jen.Qual(timePkg, "Millisecond")).
+						Dot("UnixNano").Call().Op("/").Int64().Call(jen.Qual(timePkg, "Millisecond"))
+				case fext.Type.UnixNano:
+					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().Dot("UnixNano").Call()
+				case fext.Type.UnixSecond:
+					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
+						Dot("Round").Call(jen.Qual(timePkg, "Second")).
+						Dot("Unix").Call()
+				}
+				fmtCall := numberFormatStatement(pgs.Int64T, access)
+				d[fieldName] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberN").Values(jen.Dict{
+					jen.Id("Value"): jen.Call(fmtCall),
+				})
+			default:
+				m.Failf("dynamo.field: not done: applyMarshalMsgV1 not done: timestamps must specify the conversion type %s", field.FullyQualifiedName())
+				panic("applyMarshalMsgV1 not done: timestamps must specify the conversion type")
+			}
+		case avt_number:
+			fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
+			d[fieldName] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberN").Values(jen.Dict{jen.Id("Value"): jen.Call(fmtCall)})
+		case avt_null:
+			// no-op
+		case avt_string:
+			needNullBoolTrue = true
+			stmts = append(stmts, jen.Var().Id(vname).Qual(dynamoV2Pkg, "AttributeValue"))
+			stmts = append(stmts,
+				jen.If(jen.Len(jen.Id("p").Dot(field.Name().UpperCamelCase().String())).Op("!=").Lit(0)).Block(
+					jen.Id(vname).Op("=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{jen.Id("Value"): jen.Id("p").Dot(srcName)}),
+				).Else().Block(
+					jen.Id(vname).Op("=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberNULL").Values(jen.Dict{jen.Id("Value"): jen.Id("nullBoolTrue")}),
+				),
+			)
+			d[fieldName] = jen.Id(vname)
+		case avt_string_set, avt_number_set, avt_byte_set:
+			needNullBoolTrue = true
+			arrT := jen.Op("[]").Id("string")
+			if avt == avt_byte_set {
+				arrT = jen.Op("[][]").Id("byte")
+			}
+			stmts = append(stmts, jen.Id(arrName).Op(":=").Make(arrT, jen.Lit(0), jen.Len(jen.Id("p").Dot(srcName))))
+			setType := ""
+			switch avt {
+			case avt_number_set:
+				setType = "NS"
+				fmtCall := numberFormatStatement(pt, jen.Id(arrix))
+				stmts = append(stmts,
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrName).Op("=").Append(jen.Id(arrName), jen.Call(fmtCall)),
+					),
+				)
+			case avt_byte_set:
+				setType = "BS"
+				stmts = append(stmts,
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrName).Op("=").Append(jen.Id(arrName), jen.Id(arrix)),
+					),
+				)
+			case avt_string_set:
+				setType = "SS"
+				stmts = append(stmts,
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+						jen.Id(arrName).Op("=").Append(jen.Id(arrName), jen.Id(arrix)),
+					),
+				)
+			default: // make lint happy
+
+			}
+
+			stmts = append(stmts,
+				jen.If(jen.Len(jen.Id(arrName)).Op("!=").Lit(0)).Block(
+					jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, fmt.Sprintf("AttributeValueMember%s", setType)).Values(jen.Dict{
+						jen.Id("Value"): jen.Id(arrName),
+					}),
+				).Else().Block(
+					jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberNULL").Values(jen.Dict{
+						jen.Id("Value"): jen.Id("nullBoolTrue"),
+					}),
+				),
+			)
+			d[fieldName] = jen.Id(vname)
+		}
+	}
+
+	if needNullBoolTrue {
+		stmts = append([]jen.Code{
+			jen.Id("nullBoolTrue").Op(":=").True(),
+		}, stmts...)
+	}
+
+	if needErr {
+		stmts = append([]jen.Code{
+			jen.Op("var").Id("err").Id("error"),
+		}, stmts...)
+	}
+
+	if needStringBuilder {
+		stmts = append([]jen.Code{
+			jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+		}, stmts...)
+	}
+
+	stmts = append(stmts, jen.Var().Id("av").Qual(dynamoV2Pkg, "AttributeValue"))
+	stmts = append(stmts, jen.Id("av").Op("=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberM").Values(jen.Dict{
+		jen.Id("Value"): jen.Map(jen.String()).Qual(dynamoV2Pkg, "AttributeValue").Values(d),
+	}))
+
+	stmts = append(stmts, jen.Return(jen.Id("av"), jen.Nil()))
+
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("MarshalDynamoDBAttributeValue").Params().Call(jen.Qual(dynamoV2Pkg, "AttributeValue"), jen.Id("error")).Block(
+		stmts...,
+	).Line()
+
+	return nil
+}
+
+func (m *Module) applyUnmarshalMsgV2(f *jen.File, msg pgs.Message) error {
+	structName := m.ctx.Name(msg)
+
+	var stmts []jen.Code
+
+	typeName := fmt.Sprintf("%s.%s", msg.Package().ProtoName().String(), msg.Name())
+
+	stmts = append(stmts,
+		jen.List(jen.Id("m"), jen.Id("ok").Op(":=").Id("av").Assert(jen.Op("*").Qual(dynamoV2Pkg, "AttributeValueMemberM"))),
+		jen.If(jen.Op("!").Id("ok")).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(jen.Lit("unable to unmarshal: expected type *types.AttributeValueMemberM, got %T"), jen.Id("av"))),
+		),
+	)
+
+	stmts = append(stmts,
+		jen.List(jen.Id(typeField), jen.Id("ok")).Op(":=").Id("m").Dot("Value").Index(jen.Lit(typeField)),
+		jen.If(jen.Op("!").Id("ok")).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit("dynamo: "+typeField+" missing"),
+			)),
+		),
+		jen.List(jen.Id("t"), jen.Id("ok")).Op(":=").Id(typeField).Assert(jen.Op("*").Qual(dynamoV2Pkg, "AttributeValueMemberS")),
+		jen.If(jen.Op("!").Id("ok")).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit("unable to unmarshal: expected type *types.AttributeValueMemberS, got %T"), jen.Id(typeField),
+			)),
+		),
+		jen.If(jen.Id("t").Dot("Value").Op("!=").Lit(typeName)).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit(fmt.Sprintf("dynamo: _type mismatch: %s expected, got: '%s'", typeName, "%s")),
+				jen.Id(typeField),
+			)),
+		),
+	)
+
+	stmts = append(stmts,
+		jen.List(jen.Id(valueField), jen.Id("ok")).Op(":=").Id("m").Dot("Value").Index(jen.Lit(valueField)),
+		jen.If(jen.Op("!").Id("ok")).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit("dynamo: "+valueField+" missing"),
+			)),
+		),
+		jen.List(jen.Id("v"), jen.Id("ok")).Op(":=").Id(valueField).Assert(jen.Op("*").Qual(dynamoV2Pkg, "AttributeValueMemberB")),
+		jen.If(jen.Op("!").Id("ok")).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T"), jen.Id(valueField),
+			)),
+		),
+		jen.Return(jen.Qual(protoPkg, "Unmarshal").Call(jen.Id("v").Dot("Value"), jen.Id("p"))),
+	)
+
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("UnmarshalDynamoDBAttributeValue").Params(jen.Id("av").Qual(dynamoV2Pkg, "AttributeValue")).Id("error").Block(
+		stmts...,
+	).Line()
+
+	// https://pkg.go.dev/github.com/guregu/dynamo/v2#Unmarshaler
+	// UnmarshalDynamo(av types.AttributeValue) error
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("UnmarshalDynamo").Params(jen.Id("av").Qual(dynamoV2Pkg, "AttributeValue")).Id("error").Block(
+		jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(jen.Id("av"))),
+	).Line()
+
+	// https://pkg.go.dev/github.com/guregu/dynamo/v2#ItemUnmarshaler
+	// UnmarshalDynamoItem(av map[string]types.AttributeValue) error
+	f.Func().Params(
+		jen.Id("p").Op("*").Id(structName.String()),
+	).Id("UnmarshalDynamoItem").Params(jen.Id("av").Map(jen.String()).Qual(dynamoV2Pkg, "AttributeValue")).Id("error").Block(
+		jen.Return(jen.Id("p").Dot("UnmarshalDynamoDBAttributeValue").Call(
+			jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberM").Values(jen.Dict{
+				jen.Id("Value"): jen.Id("av"),
+			}),
+		)),
+	).Line()
+
+	return nil
 }
