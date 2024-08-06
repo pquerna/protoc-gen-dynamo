@@ -23,6 +23,13 @@ github.com/aws/aws-sdk-go/private/protocol/json/jsonutil
 github.com/aws/aws-sdk-go/private/protocol/jsonrpc
 github.com/aws/aws-sdk-go/private/protocol/rest
 github.com/aws/aws-sdk-go/service/dynamodb
+# github.com/aws/aws-sdk-go-v2/service/dynamodb v1.34.4
+## explicit; go 1.20
+github.com/aws/aws-sdk-go-v2/service/dynamodb/types
+# github.com/aws/smithy-go v1.20.3
+## explicit; go 1.20
+github.com/aws/smithy-go
+github.com/aws/smithy-go/document
 # github.com/dave/jennifer v1.7.0
 ## explicit; go 1.20
 github.com/dave/jennifer/jen
