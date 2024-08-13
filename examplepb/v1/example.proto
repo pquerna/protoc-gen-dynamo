@@ -63,7 +63,8 @@ message User {
     sk_fields: ["idp_id"]
   };
   option (dynamo.v1.msg).key = {
-    pk_fields: [
+    pk_fields: ["tenant_id"]
+    sk_fields: [
       "idp_id",
       "an_enum"
     ]
@@ -85,7 +86,6 @@ enum BasicEnum {
 }
 
 message StoreV2 {
-  option (dynamo.v1.msg).use_v2_sdk = true;
   option (dynamo.v1.msg).key = {
     pk_fields: [
       "id",
@@ -132,7 +132,6 @@ message StoreV2 {
 }
 
 message UserV2 {
-  option (dynamo.v1.msg).use_v2_sdk = true;
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
     sk_fields: ["id"]
@@ -142,7 +141,8 @@ message UserV2 {
     sk_fields: ["idp_id"]
   };
   option (dynamo.v1.msg).key = {
-    pk_fields: [
+    pk_fields: ["tenant_id"]
+    sk_fields: [
       "idp_id",
       "an_enum"
     ]
