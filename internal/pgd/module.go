@@ -73,7 +73,6 @@ const (
 	stringsPkg  = "strings"
 	fmtPkg      = "fmt"
 	timePkg     = "time"
-	zstdPkg     = "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
 
 	timestampType = "google.protobuf.Timestamp"
 )
@@ -93,7 +92,6 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(fmtPkg, "fmt")
 	f.ImportName(stringsPkg, "strings")
 	f.ImportName(timePkg, "time")
-	f.ImportName(zstdPkg, "v1")
 
 	err := m.applyMarshal(f, in)
 	if err != nil {
@@ -564,7 +562,6 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 	refId++
 	valVarName := fmt.Sprintf("v%d", refId)
 	bufVName := fmt.Sprintf("v%dbuf", refId)
-	compressedVName := fmt.Sprintf("v%dcompressed", refId)
 
 	stmts = append(stmts, jen.List(jen.Id(bufVName), jen.Id("err")).Op(":=").Qual(protoPkg, "Marshal").Call(jen.Id("p")))
 	stmts = append(stmts,
@@ -572,19 +569,9 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 			jen.Return(jen.Nil(), jen.Id("err")),
 		),
 	)
-
-	// Add compression logic for large messages
-	stmts = append(stmts,
-		jen.List(jen.Id(compressedVName), jen.Id("err")).Op(":=").Qual(zstdPkg, "ZstdCompress").Call(jen.Id(bufVName)),
-		jen.If(jen.Id("err").Op("!=").Nil()).Block(
-			jen.Return(jen.Nil(), jen.Id("err")),
-		),
-	)
-	stmts = append(stmts,
-		jen.Id(valVarName).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberB").Values(jen.Dict{
-			jen.Id("Value"): jen.Id(compressedVName),
-		}),
-	)
+	stmts = append(stmts, jen.Id(valVarName).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberB").Values(jen.Dict{
+		jen.Id("Value"): jen.Id(bufVName),
+	}))
 	d[jen.Lit(valueField)] = jen.Id(valVarName)
 
 	refId++
@@ -879,13 +866,7 @@ func (m *Module) applyUnmarshalMsgV2(f *jen.File, msg pgs.Message) error {
 				jen.Lit("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T"), jen.Id(valueField),
 			)),
 		),
-		// Add decompression step for zstd compressed data
-		jen.Var().Id("data").Index().Byte(),
-		jen.List(jen.Id("data"), jen.Id("err")).Op(":=").Qual(zstdPkg, "ZstdDecompress").Call(jen.Id("v").Dot("Value")),
-		jen.If(jen.Id("err").Op("!=").Nil()).Block(
-			jen.Return(jen.Id("err")),
-		),
-		jen.Return(jen.Qual(protoPkg, "Unmarshal").Call(jen.Id("data"), jen.Id("p"))),
+		jen.Return(jen.Qual(protoPkg, "Unmarshal").Call(jen.Id("v").Dot("Value"), jen.Id("p"))),
 	)
 
 	f.Func().Params(
