@@ -20,7 +20,7 @@ var (
 	//
 	// NOTE: we use an environment variable here because
 	// there is not a context or other way to propagate what we
-	// want down to the Marsheler interfaces. Not ideal!
+	// want down to the Marshaler interfaces. Not ideal!
 	//
 	// NOTE: only disables compression of new data --
 	// any previously compressed data will still be decompressed
