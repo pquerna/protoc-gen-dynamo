@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"os"
+	"strconv"
 	"sync"
 
 	"github.com/klauspost/compress/zstd"
@@ -9,9 +11,22 @@ import (
 const (
 	// minCompressSize is the minimum size of a protobuf message before compression is applied
 	minCompressSize = 200
+
+	envDisableCompression = "GEN_DYNAMO_DISABLE_COMPRESSION"
 )
 
 var (
+	// disableCompression is a flag to disable compression
+	//
+	// NOTE: we use an environment variable here because
+	// there is not a context or other way to propagate what we
+	// want down to the Marshaler interfaces. Not ideal!
+	//
+	// NOTE: only disables compression of new data --
+	// any previously compressed data will still be decompressed
+	// on read.
+	disableCompression, _ = strconv.ParseBool(os.Getenv(envDisableCompression))
+
 	// encoderPool is a pool of zstd encoders
 	encoderPool = sync.Pool{
 		New: func() any {
@@ -79,7 +94,7 @@ func zstdIsCompressed(data []byte) bool {
 
 // CompressValue compresses data using zstd if it exceeds MinCompressSize
 func CompressValue(data []byte) ([]byte, error) {
-	if len(data) <= minCompressSize {
+	if disableCompression || len(data) <= minCompressSize {
 		return data, nil
 	}
 
