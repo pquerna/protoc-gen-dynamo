@@ -19,7 +19,7 @@ var (
 	// disableCompression is a flag to disable compression
 	//
 	// NOTE: we use an environment variable here because
-	// there is not a context or other way to propogate what we
+	// there is not a context or other way to propagate what we
 	// want down to the Marsheler interfaces. Not ideal!
 	//
 	// NOTE: only disables compression of new data --
