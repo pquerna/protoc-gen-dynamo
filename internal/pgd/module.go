@@ -66,14 +66,14 @@ func (m *Module) processFile(f pgs.File) {
 }
 
 const (
-	dynamoV2Pkg = "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	protoPkg    = "google.golang.org/protobuf/proto"
-	awsPkg      = "github.com/aws/aws-sdk-go-v2/aws"
-	strconvPkg  = "strconv"
-	stringsPkg  = "strings"
-	fmtPkg      = "fmt"
-	timePkg     = "time"
-	pbdynamoPkg = "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
+	dynamoV2Pkg  = "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	protoPkg     = "google.golang.org/protobuf/proto"
+	awsPkg       = "github.com/aws/aws-sdk-go-v2/aws"
+	strconvPkg   = "strconv"
+	stringsPkg   = "strings"
+	fmtPkg       = "fmt"
+	timePkg      = "time"
+	protozstdPkg = "github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
 
 	timestampType = "google.protobuf.Timestamp"
 )
@@ -93,7 +93,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(fmtPkg, "fmt")
 	f.ImportName(stringsPkg, "strings")
 	f.ImportName(timePkg, "time")
-	f.ImportAlias(pbdynamoPkg, "pbdynamo_v1")
+	f.ImportName(protozstdPkg, "protozstd")
 
 	err := m.applyMarshal(f, in)
 	if err != nil {
@@ -564,9 +564,8 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 	refId++
 	valVarName := fmt.Sprintf("v%d", refId)
 	bufVName := fmt.Sprintf("v%dbuf", refId)
-	compressedVName := fmt.Sprintf("v%dcompressed", refId)
 
-	stmts = append(stmts, jen.List(jen.Id(bufVName), jen.Id("err")).Op(":=").Qual(protoPkg, "Marshal").Call(jen.Id("p")))
+	stmts = append(stmts, jen.List(jen.Id(bufVName), jen.Id("err")).Op(":=").Qual(protozstdPkg, "Marshal").Call(jen.Id("p")))
 	stmts = append(stmts,
 		jen.If(jen.Id("err").Op("!=").Nil()).Block(
 			jen.Return(jen.Nil(), jen.Id("err")),
@@ -575,14 +574,8 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 
 	// Add compression logic for large messages
 	stmts = append(stmts,
-		jen.List(jen.Id(compressedVName), jen.Id("err")).Op(":=").Qual(pbdynamoPkg, "CompressValue").Call(jen.Id(bufVName)),
-		jen.If(jen.Id("err").Op("!=").Nil()).Block(
-			jen.Return(jen.Nil(), jen.Id("err")),
-		),
-	)
-	stmts = append(stmts,
 		jen.Id(valVarName).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberB").Values(jen.Dict{
-			jen.Id("Value"): jen.Id(compressedVName),
+			jen.Id("Value"): jen.Id(bufVName),
 		}),
 	)
 	d[jen.Lit(valueField)] = jen.Id(valVarName)
@@ -881,11 +874,8 @@ func (m *Module) applyUnmarshalMsgV2(f *jen.File, msg pgs.Message) error {
 		),
 		// Add decompression step for zstd compressed data
 		jen.Var().Id("data").Index().Byte(),
-		jen.List(jen.Id("data"), jen.Id("err")).Op(":=").Qual(pbdynamoPkg, "DecompressValue").Call(jen.Id("v").Dot("Value")),
-		jen.If(jen.Id("err").Op("!=").Nil()).Block(
-			jen.Return(jen.Id("err")),
-		),
-		jen.Return(jen.Qual(protoPkg, "Unmarshal").Call(jen.Id("data"), jen.Id("p"))),
+		jen.Id("data").Op("=").Id("v").Dot("Value"),
+		jen.Return(jen.Qual(protozstdPkg, "Unmarshal").Call(jen.Id("data"), jen.Id("p"))),
 	)
 
 	f.Func().Params(

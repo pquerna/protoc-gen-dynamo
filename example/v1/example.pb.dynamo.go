@@ -6,8 +6,7 @@ package v1
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	pbdynamo_v1 "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
-	"google.golang.org/protobuf/proto"
+	"github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
 	"strconv"
 	"strings"
 	"time"
@@ -55,15 +54,11 @@ func (p *Store) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	v6buf, err := proto.Marshal(p)
+	v6buf, err := protozstd.Marshal(p)
 	if err != nil {
 		return nil, err
 	}
-	v6compressed, err := pbdynamo_v1.CompressValue(v6buf)
-	if err != nil {
-		return nil, err
-	}
-	v6 := &types.AttributeValueMemberB{Value: v6compressed}
+	v6 := &types.AttributeValueMemberB{Value: v6buf}
 	v7 := &types.AttributeValueMemberS{Value: "examplepb.v1.Store"}
 	var v8 types.AttributeValue
 	if len(p.Id) != 0 {
@@ -134,15 +129,11 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	v8buf, err := proto.Marshal(p)
+	v8buf, err := protozstd.Marshal(p)
 	if err != nil {
 		return nil, err
 	}
-	v8compressed, err := pbdynamo_v1.CompressValue(v8buf)
-	if err != nil {
-		return nil, err
-	}
-	v8 := &types.AttributeValueMemberB{Value: v8compressed}
+	v8 := &types.AttributeValueMemberB{Value: v8buf}
 	v9 := &types.AttributeValueMemberS{Value: "examplepb.v1.User"}
 	v10 := &types.AttributeValueMemberBOOL{Value: p.DeletedAt.IsValid()}
 	var av types.AttributeValue
@@ -203,15 +194,11 @@ func (p *StoreV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) 
 	if err != nil {
 		return nil, err
 	}
-	v6buf, err := proto.Marshal(p)
+	v6buf, err := protozstd.Marshal(p)
 	if err != nil {
 		return nil, err
 	}
-	v6compressed, err := pbdynamo_v1.CompressValue(v6buf)
-	if err != nil {
-		return nil, err
-	}
-	v6 := &types.AttributeValueMemberB{Value: v6compressed}
+	v6 := &types.AttributeValueMemberB{Value: v6buf}
 	v7 := &types.AttributeValueMemberS{Value: "examplepb.v1.StoreV2"}
 	var v8 types.AttributeValue
 	if len(p.Id) != 0 {
@@ -282,15 +269,11 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	v8buf, err := proto.Marshal(p)
+	v8buf, err := protozstd.Marshal(p)
 	if err != nil {
 		return nil, err
 	}
-	v8compressed, err := pbdynamo_v1.CompressValue(v8buf)
-	if err != nil {
-		return nil, err
-	}
-	v8 := &types.AttributeValueMemberB{Value: v8compressed}
+	v8 := &types.AttributeValueMemberB{Value: v8buf}
 	v9 := &types.AttributeValueMemberS{Value: "examplepb.v1.UserV2"}
 	v10 := &types.AttributeValueMemberBOOL{Value: p.DeletedAt.IsValid()}
 	var av types.AttributeValue
@@ -334,11 +317,8 @@ func (p *Store) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
 		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
 	}
 	var data []byte
-	data, err := pbdynamo_v1.DecompressValue(v.Value)
-	if err != nil {
-		return err
-	}
-	return proto.Unmarshal(data, p)
+	data = v.Value
+	return protozstd.Unmarshal(data, p)
 }
 
 func (p *Store) UnmarshalDynamo(av types.AttributeValue) error {
@@ -374,11 +354,8 @@ func (p *User) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
 		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
 	}
 	var data []byte
-	data, err := pbdynamo_v1.DecompressValue(v.Value)
-	if err != nil {
-		return err
-	}
-	return proto.Unmarshal(data, p)
+	data = v.Value
+	return protozstd.Unmarshal(data, p)
 }
 
 func (p *User) UnmarshalDynamo(av types.AttributeValue) error {
@@ -414,11 +391,8 @@ func (p *StoreV2) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error
 		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
 	}
 	var data []byte
-	data, err := pbdynamo_v1.DecompressValue(v.Value)
-	if err != nil {
-		return err
-	}
-	return proto.Unmarshal(data, p)
+	data = v.Value
+	return protozstd.Unmarshal(data, p)
 }
 
 func (p *StoreV2) UnmarshalDynamo(av types.AttributeValue) error {
@@ -454,11 +428,8 @@ func (p *UserV2) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error 
 		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
 	}
 	var data []byte
-	data, err := pbdynamo_v1.DecompressValue(v.Value)
-	if err != nil {
-		return err
-	}
-	return proto.Unmarshal(data, p)
+	data = v.Value
+	return protozstd.Unmarshal(data, p)
 }
 
 func (p *UserV2) UnmarshalDynamo(av types.AttributeValue) error {
