@@ -575,7 +575,7 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 
 	// Add compression logic for large messages
 	stmts = append(stmts,
-		jen.List(jen.Id(compressedVName), jen.Id("err")).Op(":=").Qual(pbdynamoPkg, "ZstdCompress").Call(jen.Id(bufVName)),
+		jen.List(jen.Id(compressedVName), jen.Id("err")).Op(":=").Qual(pbdynamoPkg, "CompressValue").Call(jen.Id(bufVName)),
 		jen.If(jen.Id("err").Op("!=").Nil()).Block(
 			jen.Return(jen.Nil(), jen.Id("err")),
 		),
@@ -881,7 +881,7 @@ func (m *Module) applyUnmarshalMsgV2(f *jen.File, msg pgs.Message) error {
 		),
 		// Add decompression step for zstd compressed data
 		jen.Var().Id("data").Index().Byte(),
-		jen.List(jen.Id("data"), jen.Id("err")).Op(":=").Qual(pbdynamoPkg, "ZstdDecompress").Call(jen.Id("v").Dot("Value")),
+		jen.List(jen.Id("data"), jen.Id("err")).Op(":=").Qual(pbdynamoPkg, "DecompressValue").Call(jen.Id("v").Dot("Value")),
 		jen.If(jen.Id("err").Op("!=").Nil()).Block(
 			jen.Return(jen.Id("err")),
 		),

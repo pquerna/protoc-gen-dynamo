@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-func TestZstdCompress_SmallData(t *testing.T) {
+func TestCompressValue_SmallData(t *testing.T) {
 	// Data smaller than minCompressSize should not be compressed
 	smallData := []byte("This is a small test string that is less than 200 bytes")
 
-	compressed, err := ZstdCompress(smallData)
+	compressed, err := CompressValue(smallData)
 	if err != nil {
-		t.Fatalf("ZstdCompress failed: %v", err)
+		t.Fatalf("CompressValue failed: %v", err)
 	}
 
 	// The returned data should be identical to the input
@@ -25,16 +25,16 @@ func TestZstdCompress_SmallData(t *testing.T) {
 	}
 }
 
-func TestZstdCompress_LargeData(t *testing.T) {
+func TestCompressValue_LargeData(t *testing.T) {
 	// Create data larger than minCompressSize
 	largeData := make([]byte, 500)
 	for i := range largeData {
 		largeData[i] = byte(i % 256)
 	}
 
-	compressed, err := ZstdCompress(largeData)
+	compressed, err := CompressValue(largeData)
 	if err != nil {
-		t.Fatalf("ZstdCompress failed: %v", err)
+		t.Fatalf("CompressValue failed: %v", err)
 	}
 
 	// The compressed data should be different from the input
@@ -48,9 +48,9 @@ func TestZstdCompress_LargeData(t *testing.T) {
 	}
 
 	// Verify we can decompress it back
-	decompressed, err := ZstdDecompress(compressed)
+	decompressed, err := DecompressValue(compressed)
 	if err != nil {
-		t.Fatalf("ZstdDecompress failed: %v", err)
+		t.Fatalf("DecompressValue failed: %v", err)
 	}
 
 	// The decompressed data should match the original
@@ -59,17 +59,17 @@ func TestZstdCompress_LargeData(t *testing.T) {
 	}
 }
 
-func TestZstdDecompress_UncompressedData(t *testing.T) {
+func TestDecompressValue_UncompressedData(t *testing.T) {
 	// Uncompressed data should be returned as-is
 	originalData := []byte("This is not compressed data")
 
-	result, err := ZstdDecompress(originalData)
+	result, err := DecompressValue(originalData)
 	if err != nil {
-		t.Fatalf("ZstdDecompress failed: %v", err)
+		t.Fatalf("DecompressValue failed: %v", err)
 	}
 
 	if !bytes.Equal(result, originalData) {
-		t.Errorf("Uncompressed data was modified by ZstdDecompress")
+		t.Errorf("Uncompressed data was modified by DecompressValue")
 	}
 }
 

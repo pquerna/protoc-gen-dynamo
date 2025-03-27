@@ -59,7 +59,7 @@ func (p *Store) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	v6compressed, err := pbdynamo_v1.ZstdCompress(v6buf)
+	v6compressed, err := pbdynamo_v1.CompressValue(v6buf)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	v8compressed, err := pbdynamo_v1.ZstdCompress(v8buf)
+	v8compressed, err := pbdynamo_v1.CompressValue(v8buf)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (p *StoreV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) 
 	if err != nil {
 		return nil, err
 	}
-	v6compressed, err := pbdynamo_v1.ZstdCompress(v6buf)
+	v6compressed, err := pbdynamo_v1.CompressValue(v6buf)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	if err != nil {
 		return nil, err
 	}
-	v8compressed, err := pbdynamo_v1.ZstdCompress(v8buf)
+	v8compressed, err := pbdynamo_v1.CompressValue(v8buf)
 	if err != nil {
 		return nil, err
 	}
@@ -334,7 +334,7 @@ func (p *Store) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
 		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
 	}
 	var data []byte
-	data, err := pbdynamo_v1.ZstdDecompress(v.Value)
+	data, err := pbdynamo_v1.DecompressValue(v.Value)
 	if err != nil {
 		return err
 	}
@@ -374,7 +374,7 @@ func (p *User) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
 		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
 	}
 	var data []byte
-	data, err := pbdynamo_v1.ZstdDecompress(v.Value)
+	data, err := pbdynamo_v1.DecompressValue(v.Value)
 	if err != nil {
 		return err
 	}
@@ -414,7 +414,7 @@ func (p *StoreV2) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error
 		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
 	}
 	var data []byte
-	data, err := pbdynamo_v1.ZstdDecompress(v.Value)
+	data, err := pbdynamo_v1.DecompressValue(v.Value)
 	if err != nil {
 		return err
 	}
@@ -454,7 +454,7 @@ func (p *UserV2) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error 
 		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
 	}
 	var data []byte
-	data, err := pbdynamo_v1.ZstdDecompress(v.Value)
+	data, err := pbdynamo_v1.DecompressValue(v.Value)
 	if err != nil {
 		return err
 	}

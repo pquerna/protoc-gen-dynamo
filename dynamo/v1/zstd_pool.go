@@ -14,10 +14,14 @@ const (
 var (
 	// encoderPool is a pool of zstd encoders
 	encoderPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			encoder, err := zstd.NewWriter(nil,
 				zstd.WithEncoderLevel(zstd.SpeedFastest),
-				zstd.WithEncoderConcurrency(1),
+				// NOTE: similair to decoder concurrency
+				// we want to use up to all cores, but its behavoir
+				// is a little different in its default value vs 0,
+				// so we don't set it here
+				// zstd.WithEncoderConcurrency(1),
 			)
 			if err != nil {
 				panic(err)
@@ -28,9 +32,10 @@ var (
 
 	// decoderPool is a pool of zstd decoders
 	decoderPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			decoder, err := zstd.NewReader(nil,
-				zstd.WithDecoderConcurrency(1),
+				// allow concurrent decoders to use all cores
+				zstd.WithDecoderConcurrency(0),
 			)
 			if err != nil {
 				panic(err)
@@ -72,8 +77,8 @@ func zstdIsCompressed(data []byte) bool {
 		data[3] == 0xFD
 }
 
-// ZstdCompress compresses data using zstd if it exceeds MinCompressSize
-func ZstdCompress(data []byte) ([]byte, error) {
+// CompressValue compresses data using zstd if it exceeds MinCompressSize
+func CompressValue(data []byte) ([]byte, error) {
 	if len(data) <= minCompressSize {
 		return data, nil
 	}
@@ -84,8 +89,8 @@ func ZstdCompress(data []byte) ([]byte, error) {
 	return enc.EncodeAll(data, nil), nil
 }
 
-// ZstdDecompress decompresses zstd compressed data
-func ZstdDecompress(data []byte) ([]byte, error) {
+// DecompressValue decompresses zstd compressed data
+func DecompressValue(data []byte) ([]byte, error) {
 	if !zstdIsCompressed(data) {
 		return data, nil
 	}
