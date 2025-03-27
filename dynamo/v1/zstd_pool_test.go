@@ -90,7 +90,7 @@ func TestZstdIsCompressed(t *testing.T) {
 	// Test with data that has incorrect magic bytes
 	wrongMagic := []byte{0xAA, 0xBB, 0xCC, 0xDD, 0x01, 0x02}
 	if zstdIsCompressed(wrongMagic) {
-		t.Errorf("Data with wrong magic bytes incorrectly identified as compressed")
+		t.Errorf("Data with incorrect magic bytes incorrectly identified as compressed")
 	}
 
 	// Test with data that has correct magic bytes
