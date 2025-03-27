@@ -73,7 +73,7 @@ const (
 	stringsPkg  = "strings"
 	fmtPkg      = "fmt"
 	timePkg     = "time"
-	zstdPkg     = "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
+	pbdynamoPkg = "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
 
 	timestampType = "google.protobuf.Timestamp"
 )
@@ -93,7 +93,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(fmtPkg, "fmt")
 	f.ImportName(stringsPkg, "strings")
 	f.ImportName(timePkg, "time")
-	f.ImportName(zstdPkg, "v1")
+	f.ImportAlias(pbdynamoPkg, "pbdynamo_v1")
 
 	err := m.applyMarshal(f, in)
 	if err != nil {
@@ -575,7 +575,7 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 
 	// Add compression logic for large messages
 	stmts = append(stmts,
-		jen.List(jen.Id(compressedVName), jen.Id("err")).Op(":=").Qual(zstdPkg, "ZstdCompress").Call(jen.Id(bufVName)),
+		jen.List(jen.Id(compressedVName), jen.Id("err")).Op(":=").Qual(pbdynamoPkg, "ZstdCompress").Call(jen.Id(bufVName)),
 		jen.If(jen.Id("err").Op("!=").Nil()).Block(
 			jen.Return(jen.Nil(), jen.Id("err")),
 		),
@@ -881,7 +881,7 @@ func (m *Module) applyUnmarshalMsgV2(f *jen.File, msg pgs.Message) error {
 		),
 		// Add decompression step for zstd compressed data
 		jen.Var().Id("data").Index().Byte(),
-		jen.List(jen.Id("data"), jen.Id("err")).Op(":=").Qual(zstdPkg, "ZstdDecompress").Call(jen.Id("v").Dot("Value")),
+		jen.List(jen.Id("data"), jen.Id("err")).Op(":=").Qual(pbdynamoPkg, "ZstdDecompress").Call(jen.Id("v").Dot("Value")),
 		jen.If(jen.Id("err").Op("!=").Nil()).Block(
 			jen.Return(jen.Id("err")),
 		),
