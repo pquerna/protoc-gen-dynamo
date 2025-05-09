@@ -1,10 +1,12 @@
-syntax = "proto3";
+edition = "2023";
 
 package examplepb.v1;
 
 import "dynamo/v1/dynamo.proto";
+import "google/protobuf/go_features.proto";
 import "google/protobuf/timestamp.proto";
 
+option features.(pb.go).api_level = API_OPAQUE;
 option go_package = "github.com/pquerna/protoc-gen-dynamo/examplepb/v1";
 
 message Store {

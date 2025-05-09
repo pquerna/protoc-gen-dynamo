@@ -1,4 +1,4 @@
-# github.com/aws/aws-sdk-go-v2/service/dynamodb v1.42.0
+# github.com/aws/aws-sdk-go-v2/service/dynamodb v1.43.1
 ## explicit; go 1.22
 github.com/aws/aws-sdk-go-v2/service/dynamodb/types
 # github.com/aws/smithy-go v1.22.3
@@ -10,13 +10,6 @@ github.com/aws/smithy-go/document
 github.com/dave/jennifer/jen
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
-# github.com/golang/protobuf v1.5.4
-## explicit; go 1.17
-github.com/golang/protobuf/internal/gengogrpc
-github.com/golang/protobuf/proto
-github.com/golang/protobuf/protoc-gen-go
-github.com/golang/protobuf/protoc-gen-go/descriptor
-github.com/golang/protobuf/protoc-gen-go/plugin
 # github.com/klauspost/compress v1.18.0
 ## explicit; go 1.22
 github.com/klauspost/compress
@@ -27,10 +20,10 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/lyft/protoc-gen-star v0.6.2
-## explicit; go 1.14
-github.com/lyft/protoc-gen-star
-github.com/lyft/protoc-gen-star/lang/go
+# github.com/lyft/protoc-gen-star/v2 v2.0.4 => github.com/pquerna/protoc-gen-star/v2 v2.0.0-20250415201647-653a078eb414
+## explicit; go 1.23.0
+github.com/lyft/protoc-gen-star/v2
+github.com/lyft/protoc-gen-star/v2/lang/go
 # github.com/spf13/afero v1.14.0
 ## explicit; go 1.23.0
 github.com/spf13/afero
@@ -41,15 +34,15 @@ github.com/spf13/afero/mem
 golang.org/x/mod/internal/lazyregexp
 golang.org/x/mod/module
 golang.org/x/mod/semver
-# golang.org/x/sync v0.12.0
+# golang.org/x/sync v0.14.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
-# golang.org/x/text v0.23.0
+# golang.org/x/text v0.25.0
 ## explicit; go 1.23.0
 golang.org/x/text/runes
 golang.org/x/text/transform
 golang.org/x/text/unicode/norm
-# golang.org/x/tools v0.31.0
+# golang.org/x/tools v0.33.0
 ## explicit; go 1.23.0
 golang.org/x/tools/go/ast/astutil
 golang.org/x/tools/imports
@@ -64,6 +57,7 @@ golang.org/x/tools/internal/modindex
 golang.org/x/tools/internal/stdlib
 # google.golang.org/protobuf v1.36.6
 ## explicit; go 1.22
+google.golang.org/protobuf/cmd/protoc-gen-go
 google.golang.org/protobuf/cmd/protoc-gen-go/internal_gengo
 google.golang.org/protobuf/compiler/protogen
 google.golang.org/protobuf/encoding/prototext
@@ -103,3 +97,4 @@ google.golang.org/protobuf/types/dynamicpb
 google.golang.org/protobuf/types/gofeaturespb
 google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/pluginpb
+# github.com/lyft/protoc-gen-star/v2 => github.com/pquerna/protoc-gen-star/v2 v2.0.0-20250415201647-653a078eb414

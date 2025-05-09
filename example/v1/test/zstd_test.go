@@ -15,13 +15,13 @@ import (
 func TestRealProtoRoundTrip(t *testing.T) {
 	// Create a Store message from the example proto
 	now := time.Now()
-	store := &v1.Store{
-		Id:      "store123",
-		Country: "USA",
-		Region:  "West",
-		State:   "California",
-		City:    "San Francisco",
-		Closed:  false,
+	store := v1.Store_builder{
+		Id:      proto.String("store123"),
+		Country: proto.String("USA"),
+		Region:  proto.String("West"),
+		State:   proto.String("California"),
+		City:    proto.String("San Francisco"),
+		Closed:  proto.Bool(false),
 		OpeningDate: &timestamppb.Timestamp{
 			Seconds: now.Unix(),
 			Nanos:   int32(now.Nanosecond()),
@@ -31,9 +31,9 @@ func TestRealProtoRoundTrip(t *testing.T) {
 			Seconds: now.Unix(),
 			Nanos:   int32(now.Nanosecond()),
 		},
-		Foo:     12345,
+		Foo:     proto.Uint64(12345),
 		Morefoo: []uint64{1, 2, 3, 4, 5},
-	}
+	}.Build()
 
 	// Perform a full round trip using our compression layer
 	mOpts := protozstd.NewMarshalOptions()
@@ -93,9 +93,11 @@ func TestRealProtoRoundTrip(t *testing.T) {
 	t.Run("Large message", func(t *testing.T) {
 		// Create a large message by adding lots of employee IDs
 		largeStore := proto.Clone(store).(*v1.Store)
+		arr := largeStore.GetBestEmployeeIds()
 		for i := 0; i < 1000; i++ {
-			largeStore.BestEmployeeIds = append(largeStore.BestEmployeeIds, "employee"+strconv.Itoa(i))
+			arr = append(arr, "employee"+strconv.Itoa(i))
 		}
+		largeStore.SetBestEmployeeIds(arr)
 
 		// Marshal with our wrapper
 		data, err := mOpts.Marshal(largeStore)
@@ -132,13 +134,13 @@ func TestRealProtoRoundTrip(t *testing.T) {
 func BenchmarkProtoMarshalUnmarshal(b *testing.B) {
 	// Create a Store message similar to our test
 	now := time.Now()
-	store := &v1.Store{
-		Id:      "store123",
-		Country: "USA",
-		Region:  "West",
-		State:   "California",
-		City:    "San Francisco",
-		Closed:  false,
+	store := v1.Store_builder{
+		Id:      proto.String("store123"),
+		Country: proto.String("USA"),
+		Region:  proto.String("West"),
+		State:   proto.String("California"),
+		City:    proto.String("San Francisco"),
+		Closed:  proto.Bool(false),
 		OpeningDate: &timestamppb.Timestamp{
 			Seconds: now.Unix(),
 			Nanos:   int32(now.Nanosecond()),
@@ -148,9 +150,9 @@ func BenchmarkProtoMarshalUnmarshal(b *testing.B) {
 			Seconds: now.Unix(),
 			Nanos:   int32(now.Nanosecond()),
 		},
-		Foo:     12345,
+		Foo:     proto.Uint64(12345),
 		Morefoo: []uint64{1, 2, 3, 4, 5},
-	}
+	}.Build()
 
 	// Create options
 	mOpts := protozstd.NewMarshalOptions()
@@ -174,9 +176,11 @@ func BenchmarkProtoMarshalUnmarshal(b *testing.B) {
 
 	// Create a large message
 	largeStore := proto.Clone(store).(*v1.Store)
+	arr := largeStore.GetBestEmployeeIds()
 	for i := 0; i < 1000; i++ {
-		largeStore.BestEmployeeIds = append(largeStore.BestEmployeeIds, "employee"+strconv.Itoa(i))
+		arr = append(arr, "employee"+strconv.Itoa(i))
 	}
+	largeStore.SetBestEmployeeIds(arr)
 
 	b.Run("Large Message", func(b *testing.B) {
 		b.ResetTimer()

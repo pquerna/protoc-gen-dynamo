@@ -34,20 +34,20 @@ func (p *Store) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	nullBoolTrue := true
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_store:")
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(p.GetCountry())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.GetFoo()), 10))
 	v1 := &types.AttributeValueMemberS{Value: sb.String()}
 	v2 := &types.AttributeValueMemberS{Value: "example"}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_store:")
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(p.GetCountry())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.GetFoo()), 10))
 	v3 := &types.AttributeValueMemberS{Value: sb.String()}
 	v4 := &types.AttributeValueMemberS{Value: "dummyvalue"}
 	v5, err := p.Version()
@@ -61,16 +61,16 @@ func (p *Store) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	v6 := &types.AttributeValueMemberB{Value: v6buf}
 	v7 := &types.AttributeValueMemberS{Value: "examplepb.v1.Store"}
 	var v8 types.AttributeValue
-	if len(p.Id) != 0 {
-		v8 = &types.AttributeValueMemberS{Value: p.Id}
+	if len(p.GetId()) != 0 {
+		v8 = &types.AttributeValueMemberS{Value: p.GetId()}
 	} else {
 		v8 = &types.AttributeValueMemberNULL{Value: nullBoolTrue}
 	}
 	var av types.AttributeValue
 	av = &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
-		"expires_at":    &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAt.AsTime().Round(time.Second).Unix()), 10))},
-		"expires_at_ms": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAtMs.AsTime().Round(time.Millisecond).UnixNano()/int64(time.Millisecond)), 10))},
-		"expires_at_ns": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAtNs.AsTime().UnixNano()), 10))},
+		"expires_at":    &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.GetExpiresAt().AsTime().Round(time.Second).Unix()), 10))},
+		"expires_at_ms": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.GetExpiresAtMs().AsTime().Round(time.Millisecond).UnixNano()/int64(time.Millisecond)), 10))},
+		"expires_at_ns": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.GetExpiresAtNs().AsTime().UnixNano()), 10))},
 		"gsi1pk":        v3,
 		"gsi1sk":        v4,
 		"pk":            v1,
@@ -104,26 +104,26 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	var err error
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	v1 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	v2 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	v3 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
-	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(p.GetIdpId())
 	v4 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	v5 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
-	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(p.GetIdpId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatInt(int64(p.AnEnum), 10))
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	v6 := &types.AttributeValueMemberS{Value: sb.String()}
 	v7, err := p.Version()
 	if err != nil {
@@ -135,7 +135,7 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	}
 	v8 := &types.AttributeValueMemberB{Value: v8buf}
 	v9 := &types.AttributeValueMemberS{Value: "examplepb.v1.User"}
-	v10 := &types.AttributeValueMemberBOOL{Value: p.DeletedAt.IsValid()}
+	v10 := &types.AttributeValueMemberBOOL{Value: p.GetDeletedAt().IsValid()}
 	var av types.AttributeValue
 	av = &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
 		"deleted": v10,
@@ -174,20 +174,20 @@ func (p *StoreV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) 
 	nullBoolTrue := true
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_store_v_2:")
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(p.GetCountry())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.GetFoo()), 10))
 	v1 := &types.AttributeValueMemberS{Value: sb.String()}
 	v2 := &types.AttributeValueMemberS{Value: "example"}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_store_v_2:")
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(p.GetCountry())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.GetFoo()), 10))
 	v3 := &types.AttributeValueMemberS{Value: sb.String()}
 	v4 := &types.AttributeValueMemberS{Value: "dummyvalue"}
 	v5, err := p.Version()
@@ -201,16 +201,16 @@ func (p *StoreV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) 
 	v6 := &types.AttributeValueMemberB{Value: v6buf}
 	v7 := &types.AttributeValueMemberS{Value: "examplepb.v1.StoreV2"}
 	var v8 types.AttributeValue
-	if len(p.Id) != 0 {
-		v8 = &types.AttributeValueMemberS{Value: p.Id}
+	if len(p.GetId()) != 0 {
+		v8 = &types.AttributeValueMemberS{Value: p.GetId()}
 	} else {
 		v8 = &types.AttributeValueMemberNULL{Value: nullBoolTrue}
 	}
 	var av types.AttributeValue
 	av = &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
-		"expires_at":    &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAt.AsTime().Round(time.Second).Unix()), 10))},
-		"expires_at_ms": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAtMs.AsTime().Round(time.Millisecond).UnixNano()/int64(time.Millisecond)), 10))},
-		"expires_at_ns": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.ExpiresAtNs.AsTime().UnixNano()), 10))},
+		"expires_at":    &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.GetExpiresAt().AsTime().Round(time.Second).Unix()), 10))},
+		"expires_at_ms": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.GetExpiresAtMs().AsTime().Round(time.Millisecond).UnixNano()/int64(time.Millisecond)), 10))},
+		"expires_at_ns": &types.AttributeValueMemberN{Value: (strconv.FormatInt(int64(p.GetExpiresAtNs().AsTime().UnixNano()), 10))},
 		"gsi1pk":        v3,
 		"gsi1sk":        v4,
 		"pk":            v1,
@@ -244,26 +244,26 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	var err error
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	v1 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	v2 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	v3 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
-	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(p.GetIdpId())
 	v4 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	v5 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
-	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(p.GetIdpId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatInt(int64(p.AnEnum), 10))
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	v6 := &types.AttributeValueMemberS{Value: sb.String()}
 	v7, err := p.Version()
 	if err != nil {
@@ -275,7 +275,7 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	}
 	v8 := &types.AttributeValueMemberB{Value: v8buf}
 	v9 := &types.AttributeValueMemberS{Value: "examplepb.v1.UserV2"}
-	v10 := &types.AttributeValueMemberBOOL{Value: p.DeletedAt.IsValid()}
+	v10 := &types.AttributeValueMemberBOOL{Value: p.GetDeletedAt().IsValid()}
 	var av types.AttributeValue
 	av = &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
 		"deleted": v10,
@@ -441,11 +441,11 @@ func (p *UserV2) UnmarshalDynamoItem(av map[string]types.AttributeValue) error {
 }
 
 func (p *Store) Version() (int64, error) {
-	err := p.UpdatedAt.CheckValid()
+	err := p.GetUpdatedAt().CheckValid()
 	if err != nil {
 		return 0, err
 	}
-	t := p.UpdatedAt.AsTime()
+	t := p.GetUpdatedAt().AsTime()
 	return t.UnixNano(), nil
 }
 
@@ -453,20 +453,20 @@ func (p *Store) PartitionKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_store:")
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(p.GetCountry())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.GetFoo()), 10))
 	return sb.String()
 }
 
-func StorePartitionKey(id string, country string, foo uint64) string {
-	return (&Store{
+func StorePartitionKey(id *string, country *string, foo *uint64) string {
+	return (&Store_builder{
 		Country: country,
 		Foo:     foo,
 		Id:      id,
-	}).PartitionKey()
+	}).Build().PartitionKey()
 }
 
 func (p *Store) SortKey() string {
@@ -474,27 +474,27 @@ func (p *Store) SortKey() string {
 }
 
 func StoreSortKey() string {
-	return (&Store{}).SortKey()
+	return (&Store_builder{}).Build().SortKey()
 }
 
 func (p *Store) Gsi1PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_store:")
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(p.GetCountry())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.GetFoo()), 10))
 	return sb.String()
 }
 
-func StoreGsi1PkKey(id string, country string, foo uint64) string {
-	return (&Store{
+func StoreGsi1PkKey(id *string, country *string, foo *uint64) string {
+	return (&Store_builder{
 		Country: country,
 		Foo:     foo,
 		Id:      id,
-	}).Gsi1PkKey()
+	}).Build().Gsi1PkKey()
 }
 
 func (p *Store) Gsi1SkKey() string {
@@ -502,15 +502,15 @@ func (p *Store) Gsi1SkKey() string {
 }
 
 func StoreGsi1SkKey() string {
-	return (&Store{}).Gsi1SkKey()
+	return (&Store_builder{}).Build().Gsi1SkKey()
 }
 
 func (p *User) Version() (int64, error) {
-	err := p.UpdatedAt.CheckValid()
+	err := p.GetUpdatedAt().CheckValid()
 	if err != nil {
 		return 0, err
 	}
-	t := p.UpdatedAt.AsTime()
+	t := p.GetUpdatedAt().AsTime()
 	return t.UnixNano(), nil
 }
 
@@ -518,82 +518,82 @@ func (p *User) PartitionKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	return sb.String()
 }
 
-func UserPartitionKey(tenantId string) string {
-	return (&User{TenantId: tenantId}).PartitionKey()
+func UserPartitionKey(tenantId *string) string {
+	return (&User_builder{TenantId: tenantId}).Build().PartitionKey()
 }
 
 func (p *User) SortKey() string {
 	var sb strings.Builder
 	sb.Reset()
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	return sb.String()
 }
 
-func UserSortKey(id string) string {
-	return (&User{Id: id}).SortKey()
+func UserSortKey(id *string) string {
+	return (&User_builder{Id: id}).Build().SortKey()
 }
 
 func (p *User) Gsi1PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	return sb.String()
 }
 
-func UserGsi1PkKey(tenantId string) string {
-	return (&User{TenantId: tenantId}).Gsi1PkKey()
+func UserGsi1PkKey(tenantId *string) string {
+	return (&User_builder{TenantId: tenantId}).Build().Gsi1PkKey()
 }
 
 func (p *User) Gsi1SkKey() string {
 	var sb strings.Builder
 	sb.Reset()
-	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(p.GetIdpId())
 	return sb.String()
 }
 
-func UserGsi1SkKey(idpId string) string {
-	return (&User{IdpId: idpId}).Gsi1SkKey()
+func UserGsi1SkKey(idpId *string) string {
+	return (&User_builder{IdpId: idpId}).Build().Gsi1SkKey()
 }
 
 func (p *User) Gsi2PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	return sb.String()
 }
 
-func UserGsi2PkKey(tenantId string) string {
-	return (&User{TenantId: tenantId}).Gsi2PkKey()
+func UserGsi2PkKey(tenantId *string) string {
+	return (&User_builder{TenantId: tenantId}).Build().Gsi2PkKey()
 }
 
 func (p *User) Gsi2SkKey() string {
 	var sb strings.Builder
 	sb.Reset()
-	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(p.GetIdpId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatInt(int64(p.AnEnum), 10))
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	return sb.String()
 }
 
-func UserGsi2SkKey(idpId string, anEnum BasicEnum) string {
-	return (&User{
+func UserGsi2SkKey(idpId *string, anEnum *BasicEnum) string {
+	return (&User_builder{
 		AnEnum: anEnum,
 		IdpId:  idpId,
-	}).Gsi2SkKey()
+	}).Build().Gsi2SkKey()
 }
 
 func (p *StoreV2) Version() (int64, error) {
-	err := p.UpdatedAt.CheckValid()
+	err := p.GetUpdatedAt().CheckValid()
 	if err != nil {
 		return 0, err
 	}
-	t := p.UpdatedAt.AsTime()
+	t := p.GetUpdatedAt().AsTime()
 	return t.UnixNano(), nil
 }
 
@@ -601,20 +601,20 @@ func (p *StoreV2) PartitionKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_store_v_2:")
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(p.GetCountry())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.GetFoo()), 10))
 	return sb.String()
 }
 
-func StoreV2PartitionKey(id string, country string, foo uint64) string {
-	return (&StoreV2{
+func StoreV2PartitionKey(id *string, country *string, foo *uint64) string {
+	return (&StoreV2_builder{
 		Country: country,
 		Foo:     foo,
 		Id:      id,
-	}).PartitionKey()
+	}).Build().PartitionKey()
 }
 
 func (p *StoreV2) SortKey() string {
@@ -622,27 +622,27 @@ func (p *StoreV2) SortKey() string {
 }
 
 func StoreV2SortKey() string {
-	return (&StoreV2{}).SortKey()
+	return (&StoreV2_builder{}).Build().SortKey()
 }
 
 func (p *StoreV2) Gsi1PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_store_v_2:")
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(p.Country)
+	_, _ = sb.WriteString(p.GetCountry())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.Foo), 10))
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(p.GetFoo()), 10))
 	return sb.String()
 }
 
-func StoreV2Gsi1PkKey(id string, country string, foo uint64) string {
-	return (&StoreV2{
+func StoreV2Gsi1PkKey(id *string, country *string, foo *uint64) string {
+	return (&StoreV2_builder{
 		Country: country,
 		Foo:     foo,
 		Id:      id,
-	}).Gsi1PkKey()
+	}).Build().Gsi1PkKey()
 }
 
 func (p *StoreV2) Gsi1SkKey() string {
@@ -650,15 +650,15 @@ func (p *StoreV2) Gsi1SkKey() string {
 }
 
 func StoreV2Gsi1SkKey() string {
-	return (&StoreV2{}).Gsi1SkKey()
+	return (&StoreV2_builder{}).Build().Gsi1SkKey()
 }
 
 func (p *UserV2) Version() (int64, error) {
-	err := p.UpdatedAt.CheckValid()
+	err := p.GetUpdatedAt().CheckValid()
 	if err != nil {
 		return 0, err
 	}
-	t := p.UpdatedAt.AsTime()
+	t := p.GetUpdatedAt().AsTime()
 	return t.UnixNano(), nil
 }
 
@@ -666,72 +666,72 @@ func (p *UserV2) PartitionKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	return sb.String()
 }
 
-func UserV2PartitionKey(tenantId string) string {
-	return (&UserV2{TenantId: tenantId}).PartitionKey()
+func UserV2PartitionKey(tenantId *string) string {
+	return (&UserV2_builder{TenantId: tenantId}).Build().PartitionKey()
 }
 
 func (p *UserV2) SortKey() string {
 	var sb strings.Builder
 	sb.Reset()
-	_, _ = sb.WriteString(p.Id)
+	_, _ = sb.WriteString(p.GetId())
 	return sb.String()
 }
 
-func UserV2SortKey(id string) string {
-	return (&UserV2{Id: id}).SortKey()
+func UserV2SortKey(id *string) string {
+	return (&UserV2_builder{Id: id}).Build().SortKey()
 }
 
 func (p *UserV2) Gsi1PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	return sb.String()
 }
 
-func UserV2Gsi1PkKey(tenantId string) string {
-	return (&UserV2{TenantId: tenantId}).Gsi1PkKey()
+func UserV2Gsi1PkKey(tenantId *string) string {
+	return (&UserV2_builder{TenantId: tenantId}).Build().Gsi1PkKey()
 }
 
 func (p *UserV2) Gsi1SkKey() string {
 	var sb strings.Builder
 	sb.Reset()
-	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(p.GetIdpId())
 	return sb.String()
 }
 
-func UserV2Gsi1SkKey(idpId string) string {
-	return (&UserV2{IdpId: idpId}).Gsi1SkKey()
+func UserV2Gsi1SkKey(idpId *string) string {
+	return (&UserV2_builder{IdpId: idpId}).Build().Gsi1SkKey()
 }
 
 func (p *UserV2) Gsi2PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
-	_, _ = sb.WriteString(p.TenantId)
+	_, _ = sb.WriteString(p.GetTenantId())
 	return sb.String()
 }
 
-func UserV2Gsi2PkKey(tenantId string) string {
-	return (&UserV2{TenantId: tenantId}).Gsi2PkKey()
+func UserV2Gsi2PkKey(tenantId *string) string {
+	return (&UserV2_builder{TenantId: tenantId}).Build().Gsi2PkKey()
 }
 
 func (p *UserV2) Gsi2SkKey() string {
 	var sb strings.Builder
 	sb.Reset()
-	_, _ = sb.WriteString(p.IdpId)
+	_, _ = sb.WriteString(p.GetIdpId())
 	_, _ = sb.WriteString(":")
-	_, _ = sb.WriteString(strconv.FormatInt(int64(p.AnEnum), 10))
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	return sb.String()
 }
 
-func UserV2Gsi2SkKey(idpId string, anEnum BasicEnum) string {
-	return (&UserV2{
+func UserV2Gsi2SkKey(idpId *string, anEnum *BasicEnum) string {
+	return (&UserV2_builder{
 		AnEnum: anEnum,
 		IdpId:  idpId,
-	}).Gsi2SkKey()
+	}).Build().Gsi2SkKey()
 }
