@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/dave/jennifer/jen"
-	pgs "github.com/lyft/protoc-gen-star"
-	pgsgo "github.com/lyft/protoc-gen-star/lang/go"
+	pgs "github.com/lyft/protoc-gen-star/v2"
+	pgsgo "github.com/lyft/protoc-gen-star/v2/lang/go"
 
 	dynamopb "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
 )
@@ -217,9 +217,9 @@ func (m *Module) applyVersionFuncs(msg pgs.Message, f *jen.File) error {
 	//	}
 	//	t := p.UpdatedAt.AsTime()
 	// return t.UnixNano(), nil
-	stmts = append(stmts, jen.List(jen.Err()).Op(":=").Id("p").Dot(srcName).Dot("CheckValid").Call())
+	stmts = append(stmts, jen.List(jen.Err()).Op(":=").Id("p").Dot("Get"+srcName).Call().Dot("CheckValid").Call())
 	stmts = append(stmts, jen.If(jen.Err().Op("!=").Nil()).Block(jen.Return(jen.List(jen.Lit(0), jen.Err()))))
-	stmts = append(stmts, jen.List(jen.Id("t")).Op(":=").Id("p").Dot(srcName).Dot("AsTime").Call())
+	stmts = append(stmts, jen.List(jen.Id("t")).Op(":=").Id("p").Dot("Get"+srcName).Call().Dot("AsTime").Call())
 	stmts = append(stmts, jen.Return(jen.List(jen.Id("t").Dot("UnixNano").Call(), jen.Nil())))
 
 	f.Func().Params(
@@ -319,7 +319,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			}
 
 			f.Func().Id(structName.String() + key.name).Params(params...).List(jen.String()).Block(
-				jen.Return(jen.Call(jen.Op("&").Id(structName.String()).Values(d)).Dot(key.name).Call()),
+				jen.Return(jen.Call(jen.Op("&").Id(structName.String() + "_builder").Values(d)).Dot("Build").Call().Dot(key.name).Call()),
 			).Line()
 		}
 	}
@@ -342,6 +342,7 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, fiel
 		field := fieldByName(msg, fn)
 		pt := field.Type().ProtoType()
 		srcName := field.Name().UpperCamelCase().String()
+		srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
 		if !first {
 			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				jen.Lit(sep),
@@ -351,10 +352,10 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, fiel
 		switch {
 		case pt == pgs.StringT:
 			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-				jen.Id("p").Dot(srcName),
+				srcFunc,
 			))
 		case pt.IsNumeric() || pt == pgs.EnumT:
-			fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
+			fmtCall := numberFormatStatement(pt, srcFunc)
 			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				fmtCall,
 			))
@@ -596,7 +597,7 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 			refId++
 			vname := fmt.Sprintf("v%d", refId)
 			stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberBOOL").Values(jen.Dict{
-				jen.Id("Value"): jen.Id("p").Dot(srcName).Dot("IsValid").Call(),
+				jen.Id("Value"): jen.Id("p").Dot("Get" + srcName).Call().Dot("IsValid").Call(),
 			}))
 			d[jen.Lit(deletedField)] = jen.Id(vname)
 		}
@@ -643,22 +644,25 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 		switch avt {
 		case avt_bytes:
 			needNullBoolTrue = true
+			srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
 			stmts = append(stmts,
 				jen.If(jen.Len(jen.Id("p").Dot(field.Name().UpperCamelCase().String()).Op("!=").Lit(0)).Block(
-					jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberB").Values(jen.Dict{jen.Id("Value"): jen.Id("p").Dot(srcName)}),
+					jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberB").Values(jen.Dict{jen.Id("Value"): srcFunc}),
 				).Else().Block(
 					jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberNULL").Values(jen.Dict{jen.Id("Value"): jen.Id("nullBoolTrue")}),
 				)),
 			)
 			d[fieldName] = jen.Id(vname)
 		case avt_bool:
-			d[fieldName] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberBOOL").Values(jen.Dict{jen.Id("Value"): jen.Id("p").Dot(srcName)})
+			srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
+			d[fieldName] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberBOOL").Values(jen.Dict{jen.Id("Value"): srcFunc})
 		case avt_list:
+			srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
 			stmts = append(stmts,
 				jen.Id(arrName).Op(":=").Make(
 					jen.Op("[]").Qual(dynamoV2Pkg, "AttributeValue"),
 					jen.Lit(0),
-					jen.Len(jen.Id("p").Dot(srcName)),
+					jen.Len(srcFunc),
 				),
 			)
 
@@ -666,7 +670,7 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 			case pt.IsInt() || pt == pgs.DoubleT || pt == pgs.FloatT:
 				fmtCall := numberFormatStatement(pt, jen.Id(arrix))
 				stmts = append(stmts,
-					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot("Get"+srcName).Call()).Block(
 						jen.Id(arrName).Op("=").Append(
 							jen.Id(arrName),
 							jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberN").Values(jen.Dict{
@@ -679,7 +683,7 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 				)
 			case pt == pgs.StringT:
 				stmts = append(stmts,
-					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot("Get"+srcName).Call()).Block(
 						jen.Id(arrName).Op("=").Append(
 							jen.Id(arrName),
 							jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
@@ -706,13 +710,13 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 				switch {
 				case fext.Type.UnixMilli:
 					// .Round(time.Millisecond).UnixNano() / time.Millisecond
-					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
+					access = jen.Id("p").Dot("Get" + srcName).Call().Dot("AsTime").Call().
 						Dot("Round").Call(jen.Qual(timePkg, "Millisecond")).
 						Dot("UnixNano").Call().Op("/").Int64().Call(jen.Qual(timePkg, "Millisecond"))
 				case fext.Type.UnixNano:
-					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().Dot("UnixNano").Call()
+					access = jen.Id("p").Dot("Get" + srcName).Call().Dot("AsTime").Call().Dot("UnixNano").Call()
 				case fext.Type.UnixSecond:
-					access = jen.Id("p").Dot(srcName).Dot("AsTime").Call().
+					access = jen.Id("p").Dot("Get" + srcName).Call().Dot("AsTime").Call().
 						Dot("Round").Call(jen.Qual(timePkg, "Second")).
 						Dot("Unix").Call()
 				}
@@ -725,16 +729,19 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 				panic("applyMarshalMsgV1 not done: timestamps must specify the conversion type")
 			}
 		case avt_number:
-			fmtCall := numberFormatStatement(pt, jen.Id("p").Dot(srcName))
+			srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
+			fmtCall := numberFormatStatement(pt, srcFunc)
 			d[fieldName] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberN").Values(jen.Dict{jen.Id("Value"): jen.Call(fmtCall)})
 		case avt_null:
 			// no-op
 		case avt_string:
 			needNullBoolTrue = true
 			stmts = append(stmts, jen.Var().Id(vname).Qual(dynamoV2Pkg, "AttributeValue"))
+			srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
 			stmts = append(stmts,
-				jen.If(jen.Len(jen.Id("p").Dot(field.Name().UpperCamelCase().String())).Op("!=").Lit(0)).Block(
-					jen.Id(vname).Op("=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{jen.Id("Value"): jen.Id("p").Dot(srcName)}),
+				jen.If(
+					jen.Len(srcFunc).Op("!=").Lit(0)).Block(
+					jen.Id(vname).Op("=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{jen.Id("Value"): srcFunc}),
 				).Else().Block(
 					jen.Id(vname).Op("=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberNULL").Values(jen.Dict{jen.Id("Value"): jen.Id("nullBoolTrue")}),
 				),
@@ -746,28 +753,28 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 			if avt == avt_byte_set {
 				arrT = jen.Op("[][]").Id("byte")
 			}
-			stmts = append(stmts, jen.Id(arrName).Op(":=").Make(arrT, jen.Lit(0), jen.Len(jen.Id("p").Dot(srcName))))
+			stmts = append(stmts, jen.Id(arrName).Op(":=").Make(arrT, jen.Lit(0), jen.Len(jen.Id("p").Dot("Get"+srcName).Call())))
 			setType := ""
 			switch avt {
 			case avt_number_set:
 				setType = "NS"
 				fmtCall := numberFormatStatement(pt, jen.Id(arrix))
 				stmts = append(stmts,
-					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot("Get"+srcName).Call()).Block(
 						jen.Id(arrName).Op("=").Append(jen.Id(arrName), jen.Call(fmtCall)),
 					),
 				)
 			case avt_byte_set:
 				setType = "BS"
 				stmts = append(stmts,
-					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot("Get"+srcName).Call()).Block(
 						jen.Id(arrName).Op("=").Append(jen.Id(arrName), jen.Id(arrix)),
 					),
 				)
 			case avt_string_set:
 				setType = "SS"
 				stmts = append(stmts,
-					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot(srcName)).Block(
+					jen.For(jen.List(jen.Id("_"), jen.Id(arrix)).Op(":=").Range().Id("p").Dot("Get"+srcName).Call()).Block(
 						jen.Id(arrName).Op("=").Append(jen.Id(arrName), jen.Id(arrix)),
 					),
 				)
