@@ -56,6 +56,11 @@ message Store {
 }
 
 message User {
+  option (dynamo.v1.msg).shard = {
+    enabled: true,
+    shard_count: 32,
+    shard_field: "shard_id"
+  };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
     sk_fields: ["id"]
@@ -80,6 +85,7 @@ message User {
   string display_name = 7;
   string email = 8;
   BasicEnum an_enum = 9;
+  uint32 shard_id = 10;
 }
 
 enum BasicEnum {

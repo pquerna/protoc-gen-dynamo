@@ -2,6 +2,7 @@ package pgd
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -74,9 +75,65 @@ const (
 	fmtPkg       = "fmt"
 	timePkg      = "time"
 	protozstdPkg = "github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
+	cryptoPkg    = "crypto/sha256"
 
 	timestampType = "google.protobuf.Timestamp"
 )
+
+// calculateShard computes the shard ID based on PK:SK using SHA256 hash
+func calculateShard(pkSk string, shardCount uint32) uint32 {
+	hash := sha256.Sum256([]byte(pkSk))
+	// Use first 4 bytes as uint32
+	hashValue := uint32(hash[0])<<24 | uint32(hash[1])<<16 | uint32(hash[2])<<8 | uint32(hash[3])
+	return hashValue % shardCount
+}
+
+// isShardingEnabled checks if sharding is enabled for a message
+func isShardingEnabled(mext *dynamopb.DynamoMessageOptions) bool {
+	return mext.Shard != nil && mext.Shard.Enabled && mext.Shard.ShardCount > 0
+}
+
+// validateShardConfig validates that sharding configuration is correct
+func validateShardConfig(msg pgs.Message, mext *dynamopb.DynamoMessageOptions) error {
+	// If sharding config exists and enabled is true, validate regardless of shard_count
+	if mext.Shard == nil || !mext.Shard.Enabled {
+		return nil
+	}
+
+	// Validate shard_field is specified
+	if mext.Shard.ShardField == "" {
+		return fmt.Errorf("sharding is enabled for message %s but shard_field is not specified", msg.FullyQualifiedName())
+	}
+
+	// Validate shard_field exists in the message
+	shardFieldExists := false
+	for _, field := range msg.Fields() {
+		if field.Name().LowerSnakeCase().String() == mext.Shard.ShardField {
+			shardFieldExists = true
+			// Validate field type is uint32
+			if field.Type().ProtoType() != pgs.UInt32T {
+				return fmt.Errorf("shard_field %s in message %s must be of type uint32, got %s",
+					mext.Shard.ShardField, msg.FullyQualifiedName(), field.Type().ProtoType().String())
+			}
+			break
+		}
+	}
+
+	if !shardFieldExists {
+		return fmt.Errorf("shard_field %s specified in message %s but field does not exist",
+			mext.Shard.ShardField, msg.FullyQualifiedName())
+	}
+
+	// Validate shard_count is reasonable (> 0 and <= 1024)
+	if mext.Shard.ShardCount == 0 {
+		return fmt.Errorf("shard_count must be greater than 0 for message %s", msg.FullyQualifiedName())
+	}
+	if mext.Shard.ShardCount > 1024 {
+		return fmt.Errorf("shard_count must be <= 1024 for message %s (got %d)", msg.FullyQualifiedName(), mext.Shard.ShardCount)
+	}
+
+	return nil
+}
 
 func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	pkgName := m.ctx.PackageName(in).String()
@@ -94,6 +151,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(stringsPkg, "strings")
 	f.ImportName(timePkg, "time")
 	f.ImportName(protozstdPkg, "protozstd")
+	f.ImportName(cryptoPkg, "sha256")
 
 	err := m.applyMarshal(f, in)
 	if err != nil {
@@ -243,10 +301,15 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			continue
 		}
 
+		// Validate shard configuration
+		if err := validateShardConfig(msg, &mext); err != nil {
+			m.Logf("Shard configuration validation failed: %s", err)
+			m.Fail("code generation failed")
+		}
+
 		var keys []namedKey
 		// pk, sk, gsi1pk, gsi1sk
 		for i, ck := range mext.Key {
-
 			pkName := "PartitionKey"
 			if i != 0 {
 				pkName = fmt.Sprintf("Gsi%dPkKey", i)
@@ -297,7 +360,17 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				stmts = append(stmts,
 					jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
 				)
-				stmts = generateKeyStringer(msg, stmts, key.prefix, key.fields, stringBuffer)
+
+				// Check if this is a partition key and sharding is enabled
+				if key.prefix && key.name == "PartitionKey" && isShardingEnabled(&mext) {
+					// Use sharded key generation for the primary partition key
+					if len(mext.Key) > 0 {
+						stmts = generateShardedKeyStringer(msg, stmts, key.prefix, mext.Key[0].PkFields, mext.Key[0].SkFields, mext.Shard, stringBuffer)
+					}
+				} else {
+					stmts = generateKeyStringer(msg, stmts, key.prefix, key.fields, stringBuffer)
+				}
+
 				stmts = append(stmts,
 					jen.Return(jen.Id(stringBuffer).Dot("String").Call()),
 				)
@@ -366,6 +439,135 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, fiel
 	return stmts
 }
 
+// generateShardedKeyStringer generates a sharded partition key by calculating shard based on PK:SK
+func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, pkFields []string, skFields []string, shardConfig *dynamopb.ShardConfig, stringBuffer string) []jen.Code {
+	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
+	sep := ":"
+	prefix := ""
+	if addPrefix {
+		prefix = fmt.Sprintf("%s_%s", msg.Package().ProtoName().LowerSnakeCase().String(), msg.Name().LowerSnakeCase().String())
+		stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+			jen.Lit(prefix+sep),
+		))
+	}
+
+	// First, compute PK:SK for sharding
+	stmts = append(stmts, jen.Op("var").Id("pkskBuilder").Qual(stringsPkg, "Builder"))
+
+	// Build PK part
+	first := true
+	for _, fn := range pkFields {
+		field := fieldByName(msg, fn)
+		pt := field.Type().ProtoType()
+		srcName := field.Name().UpperCamelCase().String()
+		srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
+		if !first {
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+				jen.Lit(sep),
+			))
+		}
+		first = false
+		switch {
+		case pt == pgs.StringT:
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+				srcFunc,
+			))
+		case pt.IsNumeric() || pt == pgs.EnumT:
+			fmtCall := numberFormatStatement(pt, srcFunc)
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+				fmtCall,
+			))
+		default:
+			panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
+		}
+	}
+
+	// Add separator between PK and SK
+	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+		jen.Lit(sep),
+	))
+
+	// Build SK part
+	first = true
+	for _, fn := range skFields {
+		field := fieldByName(msg, fn)
+		pt := field.Type().ProtoType()
+		srcName := field.Name().UpperCamelCase().String()
+		srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
+		if !first {
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+				jen.Lit(sep),
+			))
+		}
+		first = false
+		switch {
+		case pt == pgs.StringT:
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+				srcFunc,
+			))
+		case pt.IsNumeric() || pt == pgs.EnumT:
+			fmtCall := numberFormatStatement(pt, srcFunc)
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+				fmtCall,
+			))
+		default:
+			panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
+		}
+	}
+
+	// Calculate shard
+	stmts = append(stmts, jen.Id("pkskStr").Op(":=").Id("pkskBuilder").Dot("String").Call())
+	stmts = append(stmts, jen.Id("hash").Op(":=").Qual(cryptoPkg, "Sum256").Call(jen.Index().Byte().Call(jen.Id("pkskStr"))))
+	stmts = append(stmts, jen.Id("hashValue").Op(":=").Uint32().Call(jen.Id("hash").Index(jen.Lit(0))).Op("<<").Lit(24).Op("|").Uint32().Call(jen.Id("hash").Index(jen.Lit(1))).Op("<<").Lit(16).Op("|").Uint32().Call(jen.Id("hash").Index(jen.Lit(2))).Op("<<").Lit(8).Op("|").Uint32().Call(jen.Id("hash").Index(jen.Lit(3))))
+	if shardConfig.ShardCount <= 0 || shardConfig.ShardCount > 64 {
+		panic("generateShardedKeyStringer: shard count must be between 0 and 64")
+	}
+	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("%").Lit(shardConfig.ShardCount))
+
+	// Set shard field in the struct
+	shardField := fieldByName(msg, shardConfig.ShardField)
+	shardSrcName := shardField.Name().UpperCamelCase().String()
+	stmts = append(stmts, jen.Id("p").Dot(shardSrcName).Op("=").Id("shardId"))
+
+	// Now build the actual partition key with shard
+	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+		jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id("shardId")), jen.Lit(10)),
+	))
+	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+		jen.Lit(sep),
+	))
+
+	// Add the original PK fields
+	first = true
+	for _, fn := range pkFields {
+		field := fieldByName(msg, fn)
+		pt := field.Type().ProtoType()
+		srcName := field.Name().UpperCamelCase().String()
+		srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
+		if !first {
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+				jen.Lit(sep),
+			))
+		}
+		first = false
+		switch {
+		case pt == pgs.StringT:
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+				srcFunc,
+			))
+		case pt.IsNumeric() || pt == pgs.EnumT:
+			fmtCall := numberFormatStatement(pt, srcFunc)
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+				fmtCall,
+			))
+		default:
+			panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
+		}
+	}
+
+	return stmts
+}
+
 const (
 	valueField   = "value"
 	deletedField = "deleted"
@@ -383,6 +585,12 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 		if ok && mext.Disabled {
 			m.Logf("dynamo.msg disabled for %s", m.ctx.Name(msg))
 			continue
+		}
+
+		// Validate shard configuration
+		if err := validateShardConfig(msg, &mext); err != nil {
+			m.Logf("Shard configuration validation failed: %s", err)
+			m.Fail("code generation failed")
 		}
 
 		// https://pkg.go.dev/github.com/guregu/dynamo/v2#Marshaler
@@ -525,7 +733,13 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 		}
 		refId++
 		vname := fmt.Sprintf("v%d", refId)
-		stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
+
+		// Use sharded key generation for primary partition key if sharding is enabled
+		if i == 0 && isShardingEnabled(mext) {
+			stmts = generateShardedKeyStringer(msg, stmts, true, ck.PkFields, ck.SkFields, mext.Shard, stringBuffer)
+		} else {
+			stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
+		}
 		stmts = append(stmts, jen.Id(vname).Op(":=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
 			jen.Id("Value"): jen.Id(stringBuffer).Dot("String").Call(),
 		}))

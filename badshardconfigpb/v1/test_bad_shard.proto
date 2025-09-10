@@ -1,0 +1,109 @@
+edition = "2023";
+
+package badshardconfig.v1;
+
+import "dynamo/v1/dynamo.proto";
+
+option go_package = "github.com/pquerna/protoc-gen-dynamo/badshardconfig/v1";
+
+// This file contains various bad sharding configurations to test validation.
+// Since protoc stops at the first validation error, to test each case:
+// 1. Comment out all messages except the one you want to test
+// 2. Run: protoc --plugin=protoc-gen-dynamo=./build/protoc-gen-dynamo --dynamo_out=./test_validation --proto_path=proto --proto_path=. badshardconfigpb/v1/test_bad_shard.proto
+// 3. Expected behavior: BadUser1-BadUser5 should fail validation, GoodUser should succeed
+
+// Test case 1: sharding enabled but no shard_field specified
+message BadUser1 {
+  option (dynamo.v1.msg).shard = {
+    enabled: true
+    shard_count: 32
+    // shard_field missing - should cause validation error
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  string tenant_id = 1;
+  string id = 2;
+  uint32 shard_id = 3;
+}
+
+// Test case 2: sharding enabled with shard_field but field doesn't exist
+message BadUser2 {
+  option (dynamo.v1.msg).shard = {
+    enabled: true
+    shard_count: 32
+    shard_field: "nonexistent_field"  // field doesn't exist - should cause validation error
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  string tenant_id = 1;
+  string id = 2;
+  uint32 shard_id = 3;
+}
+
+// Test case 3: sharding enabled with wrong field type
+message BadUser3 {
+  option (dynamo.v1.msg).shard = {
+    enabled: true
+    shard_count: 32
+    shard_field: "bad_shard_id"  // field exists but wrong type - should cause validation error
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  string tenant_id = 1;
+  string id = 2;
+  string bad_shard_id = 3;  // string instead of uint32
+}
+
+// Test case 4: shard_count too high (> 1024)
+message BadUser4 {
+  option (dynamo.v1.msg).shard = {
+    enabled: true
+    shard_count: 2000  // should cause validation error (> 1024)
+    shard_field: "shard_id"
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  string tenant_id = 1;
+  string id = 2;
+  uint32 shard_id = 3;
+}
+
+// Test case 5: shard_count is 0 (should cause validation error)
+message BadUser5 {
+  option (dynamo.v1.msg).shard = {
+    enabled: true
+    shard_count: 0  // should cause validation error - shard_count must be > 0
+    shard_field: "shard_id"
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  string tenant_id = 1;
+  string id = 2;
+  uint32 shard_id = 3;
+}
+
+// Test case 6: Good sharding config for comparison (this should work)
+message GoodUser {
+  option (dynamo.v1.msg).shard = {
+    enabled: true
+    shard_count: 32
+    shard_field: "shard_id"
+  };
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  string tenant_id = 1;
+  string id = 2;
+  uint32 shard_id = 3;
+}
