@@ -529,15 +529,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 	shardSrcName := shardField.Name().UpperCamelCase().String()
 	stmts = append(stmts, jen.Id("p").Dot(shardSrcName).Op("=").Id("shardId"))
 
-	// Now build the actual partition key with shard
-	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-		jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id("shardId")), jen.Lit(10)),
-	))
-	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-		jen.Lit(sep),
-	))
-
-	// Add the original PK fields
+	// Now build the actual partition key with original PK fields first
 	first = true
 	for _, fn := range pkFields {
 		field := fieldByName(msg, fn)
@@ -564,6 +556,14 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 			panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
 		}
 	}
+
+	// Add the shard at the end
+	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+		jen.Lit(sep),
+	))
+	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+		jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id("shardId")), jen.Lit(10)),
+	))
 
 	return stmts
 }
