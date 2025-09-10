@@ -152,11 +152,14 @@ message UserV2 {
     }
   };
   option (dynamo.v1.msg).key = {
-    pk_fields: ["tenant_id"]
+    pk_fields: ["tenant_id", "idp_id"]
     sk_fields: [
-      "idp_id",
       "an_enum"
     ]
+    shard: {
+      enabled: true
+      shard_count: 512
+    }
   };
   string tenant_id = 1;
   string id = 2;

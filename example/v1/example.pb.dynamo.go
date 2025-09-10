@@ -271,10 +271,10 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
 	v5 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
-	_, _ = sb.WriteString(p.GetIdpId())
-	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	v6 := &types.AttributeValueMemberS{Value: sb.String()}
 	v7, err := p.Version()
@@ -761,28 +761,40 @@ func (p *UserV2) Gsi2PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	var pkskBuilder strings.Builder
+	_, _ = pkskBuilder.WriteString(p.GetTenantId())
+	_, _ = pkskBuilder.WriteString(":")
+	_, _ = pkskBuilder.WriteString(p.GetIdpId())
+	_, _ = pkskBuilder.WriteString(":")
+	_, _ = pkskBuilder.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
+	pkskStr := pkskBuilder.String()
+	hash := sha256.Sum256([]byte(pkskStr))
+	hashValue := binary.BigEndian.Uint32(hash[:4])
+	shardId := hashValue % uint32(0x200)
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
 	return sb.String()
 }
 
-func UserV2Gsi2PkKey(tenantId *string) string {
-	return (&UserV2_builder{TenantId: tenantId}).Build().Gsi2PkKey()
+func UserV2Gsi2PkKey(tenantId *string, idpId *string) string {
+	return (&UserV2_builder{
+		IdpId:    idpId,
+		TenantId: tenantId,
+	}).Build().Gsi2PkKey()
 }
 
 func (p *UserV2) Gsi2SkKey() string {
 	var sb strings.Builder
 	sb.Reset()
-	_, _ = sb.WriteString(p.GetIdpId())
-	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	return sb.String()
 }
 
-func UserV2Gsi2SkKey(idpId *string, anEnum *BasicEnum) string {
-	return (&UserV2_builder{
-		AnEnum: anEnum,
-		IdpId:  idpId,
-	}).Build().Gsi2SkKey()
+func UserV2Gsi2SkKey(anEnum *BasicEnum) string {
+	return (&UserV2_builder{AnEnum: anEnum}).Build().Gsi2SkKey()
 }
 
 func (p *UserV2) Gsi1PaginationKeyWithShard(shard uint32) string {
@@ -798,6 +810,25 @@ func (p *UserV2) Gsi1PaginationKeysWithShard() []string {
 	keys := make([]string, 0, uint32(0x400))
 	for i := uint32(0); i < uint32(0x400); i++ {
 		keys = append(keys, p.Gsi1PaginationKeyWithShard(i))
+	}
+	return keys
+}
+
+func (p *UserV2) Gsi2PaginationKeyWithShard(shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func (p *UserV2) Gsi2PaginationKeysWithShard() []string {
+	keys := make([]string, 0, uint32(0x200))
+	for i := uint32(0); i < uint32(0x200); i++ {
+		keys = append(keys, p.Gsi2PaginationKeyWithShard(i))
 	}
 	return keys
 }
