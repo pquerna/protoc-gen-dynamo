@@ -56,14 +56,13 @@ message Store {
 }
 
 message User {
-  option (dynamo.v1.msg).shard = {
-    enabled: true,
-    shard_count: 32,
-    shard_field: "shard_id"
-  };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
     sk_fields: ["id"]
+    shard: {
+      enabled: true
+      shard_count: 32
+    }
   };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
@@ -147,6 +146,10 @@ message UserV2 {
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
     sk_fields: ["idp_id"]
+    shard: {
+      enabled: true
+      shard_count: 1024
+    }
   };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]

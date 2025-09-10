@@ -4,6 +4,8 @@
 package v1
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
@@ -104,7 +106,17 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	var err error
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
+	var pkskBuilder strings.Builder
+	_, _ = pkskBuilder.WriteString(p.GetTenantId())
+	_, _ = pkskBuilder.WriteString(":")
+	_, _ = pkskBuilder.WriteString(p.GetId())
+	pkskStr := pkskBuilder.String()
+	hash := sha256.Sum256([]byte(pkskStr))
+	hashValue := binary.BigEndian.Uint32(hash[:4])
+	shardId := hashValue % uint32(0x20)
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
 	v1 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString(p.GetId())
@@ -518,7 +530,17 @@ func (p *User) PartitionKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
+	var pkskBuilder strings.Builder
+	_, _ = pkskBuilder.WriteString(p.GetTenantId())
+	_, _ = pkskBuilder.WriteString(":")
+	_, _ = pkskBuilder.WriteString(p.GetId())
+	pkskStr := pkskBuilder.String()
+	hash := sha256.Sum256([]byte(pkskStr))
+	hashValue := binary.BigEndian.Uint32(hash[:4])
+	shardId := hashValue % uint32(0x20)
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
 	return sb.String()
 }
 
@@ -586,6 +608,23 @@ func UserGsi2SkKey(idpId *string, anEnum *BasicEnum) string {
 		AnEnum: anEnum,
 		IdpId:  idpId,
 	}).Build().Gsi2SkKey()
+}
+
+func (p *User) PaginationKeyWithShard(shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func (p *User) PaginationKeysWithShard() []string {
+	keys := make([]string, 0, uint32(0x20))
+	for i := uint32(0); i < uint32(0x20); i++ {
+		keys = append(keys, p.PaginationKeyWithShard(i))
+	}
+	return keys
 }
 
 func (p *StoreV2) Version() (int64, error) {
@@ -689,7 +728,17 @@ func (p *UserV2) Gsi1PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	var pkskBuilder strings.Builder
+	_, _ = pkskBuilder.WriteString(p.GetTenantId())
+	_, _ = pkskBuilder.WriteString(":")
+	_, _ = pkskBuilder.WriteString(p.GetIdpId())
+	pkskStr := pkskBuilder.String()
+	hash := sha256.Sum256([]byte(pkskStr))
+	hashValue := binary.BigEndian.Uint32(hash[:4])
+	shardId := hashValue % uint32(0x400)
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
 	return sb.String()
 }
 
@@ -734,4 +783,21 @@ func UserV2Gsi2SkKey(idpId *string, anEnum *BasicEnum) string {
 		AnEnum: anEnum,
 		IdpId:  idpId,
 	}).Build().Gsi2SkKey()
+}
+
+func (p *UserV2) Gsi1PaginationKeyWithShard(shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func (p *UserV2) Gsi1PaginationKeysWithShard() []string {
+	keys := make([]string, 0, uint32(0x400))
+	for i := uint32(0); i < uint32(0x400); i++ {
+		keys = append(keys, p.Gsi1PaginationKeyWithShard(i))
+	}
+	return keys
 }

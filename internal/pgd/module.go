@@ -3,6 +3,7 @@ package pgd
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"strings"
@@ -76,6 +77,7 @@ const (
 	timePkg      = "time"
 	protozstdPkg = "github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
 	cryptoPkg    = "crypto/sha256"
+	binaryPkg    = "encoding/binary"
 
 	timestampType = "google.protobuf.Timestamp"
 )
@@ -83,53 +85,29 @@ const (
 // calculateShard computes the shard ID based on PK:SK using SHA256 hash
 func calculateShard(pkSk string, shardCount uint32) uint32 {
 	hash := sha256.Sum256([]byte(pkSk))
-	// Use first 4 bytes as uint32
-	hashValue := uint32(hash[0])<<24 | uint32(hash[1])<<16 | uint32(hash[2])<<8 | uint32(hash[3])
+	// Use first 4 bytes as uint32 (BIG ENDIAN)
+	hashValue := binary.BigEndian.Uint32(hash[:4])
 	return hashValue % shardCount
 }
 
-// isShardingEnabled checks if sharding is enabled for a message
-func isShardingEnabled(mext *dynamopb.DynamoMessageOptions) bool {
-	return mext.Shard != nil && mext.Shard.Enabled && mext.Shard.ShardCount > 0
+// isShardingEnabled checks if sharding is enabled for a key
+func isShardingEnabled(key *dynamopb.Key) bool {
+	return key != nil && key.Shard != nil && key.Shard.Enabled && key.Shard.ShardCount > 0
 }
 
 // validateShardConfig validates that sharding configuration is correct
-func validateShardConfig(msg pgs.Message, mext *dynamopb.DynamoMessageOptions) error {
-	// If sharding config exists and enabled is true, validate regardless of shard_count
-	if mext.Shard == nil || !mext.Shard.Enabled {
+func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
+	// If sharding config exists and enabled is true, validate shard_count
+	if key == nil || key.Shard == nil || !key.Shard.Enabled {
 		return nil
 	}
 
-	// Validate shard_field is specified
-	if mext.Shard.ShardField == "" {
-		return fmt.Errorf("sharding is enabled for message %s but shard_field is not specified", msg.FullyQualifiedName())
+	// Validate shard_count is reasonable (> 1 and <= 1024)
+	if key.Shard.ShardCount < 2 {
+		return fmt.Errorf("shard_count must be greater than 1 for message %s", msg.FullyQualifiedName())
 	}
-
-	// Validate shard_field exists in the message
-	shardFieldExists := false
-	for _, field := range msg.Fields() {
-		if field.Name().LowerSnakeCase().String() == mext.Shard.ShardField {
-			shardFieldExists = true
-			// Validate field type is uint32
-			if field.Type().ProtoType() != pgs.UInt32T {
-				return fmt.Errorf("shard_field %s in message %s must be of type uint32, got %s",
-					mext.Shard.ShardField, msg.FullyQualifiedName(), field.Type().ProtoType().String())
-			}
-			break
-		}
-	}
-
-	if !shardFieldExists {
-		return fmt.Errorf("shard_field %s specified in message %s but field does not exist",
-			mext.Shard.ShardField, msg.FullyQualifiedName())
-	}
-
-	// Validate shard_count is reasonable (> 0 and <= 1024)
-	if mext.Shard.ShardCount == 0 {
-		return fmt.Errorf("shard_count must be greater than 0 for message %s", msg.FullyQualifiedName())
-	}
-	if mext.Shard.ShardCount > 1024 {
-		return fmt.Errorf("shard_count must be <= 1024 for message %s (got %d)", msg.FullyQualifiedName(), mext.Shard.ShardCount)
+	if key.Shard.ShardCount > 1024 {
+		return fmt.Errorf("shard_count must be <= 1024 for message %s (got %d)", msg.FullyQualifiedName(), key.Shard.ShardCount)
 	}
 
 	return nil
@@ -152,6 +130,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(timePkg, "time")
 	f.ImportName(protozstdPkg, "protozstd")
 	f.ImportName(cryptoPkg, "sha256")
+	f.ImportName(binaryPkg, "binary")
 
 	err := m.applyMarshal(f, in)
 	if err != nil {
@@ -301,10 +280,12 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			continue
 		}
 
-		// Validate shard configuration
-		if err := validateShardConfig(msg, &mext); err != nil {
-			m.Logf("Shard configuration validation failed: %s", err)
-			m.Fail("code generation failed")
+		// Validate shard configuration for each key
+		for _, key := range mext.Key {
+			if err := validateShardConfig(msg, key); err != nil {
+				m.Logf("Shard configuration validation failed: %s", err)
+				m.Fail("code generation failed")
+			}
 		}
 
 		var keys []namedKey
@@ -361,12 +342,21 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 					jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
 				)
 
-				// Check if this is a partition key and sharding is enabled
-				if key.prefix && key.name == "PartitionKey" && isShardingEnabled(&mext) {
-					// Use sharded key generation for the primary partition key
-					if len(mext.Key) > 0 {
-						stmts = generateShardedKeyStringer(msg, stmts, key.prefix, mext.Key[0].PkFields, mext.Key[0].SkFields, mext.Shard, stringBuffer)
+				// Check if this is a partition key with sharding enabled
+				var keyIndex int = -1
+				if key.prefix {
+					if key.name == "PartitionKey" {
+						keyIndex = 0
+					} else {
+						// Extract GSI index from name like "Gsi1PkKey"
+						fmt.Sscanf(key.name, "Gsi%dPkKey", &keyIndex)
 					}
+				}
+
+				if keyIndex >= 0 && keyIndex < len(mext.Key) && isShardingEnabled(mext.Key[keyIndex]) {
+					// Use sharded key generation for this partition key
+					ck := mext.Key[keyIndex]
+					stmts = generateShardedKeyStringer(msg, stmts, key.prefix, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer)
 				} else {
 					stmts = generateKeyStringer(msg, stmts, key.prefix, key.fields, stringBuffer)
 				}
@@ -393,6 +383,99 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 			f.Func().Id(structName.String() + key.name).Params(params...).List(jen.String()).Block(
 				jen.Return(jen.Call(jen.Op("&").Id(structName.String() + "_builder").Values(d)).Dot("Build").Call().Dot(key.name).Call()),
+			).Line()
+		}
+
+		// Generate pagination functions for each sharded key
+		for i, ck := range mext.Key {
+			if !isShardingEnabled(ck) {
+				continue
+			}
+
+			// Determine function name suffix based on key index
+			var funcSuffix string
+			if i == 0 {
+				funcSuffix = ""
+			} else {
+				funcSuffix = fmt.Sprintf("Gsi%d", i)
+			}
+
+			// PaginationKeyWithShard(shard uint32) string
+			var paginationStmts []jen.Code
+			paginationStmts = append(paginationStmts,
+				jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+			)
+
+			// Build prefix
+			prefix := fmt.Sprintf("%s_%s", msg.Package().ProtoName().LowerSnakeCase().String(), msg.Name().LowerSnakeCase().String())
+			paginationStmts = append(paginationStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+				jen.Lit(prefix+":"),
+			))
+
+			// Add PK fields
+			first := true
+			for _, fn := range ck.PkFields {
+				field := fieldByName(msg, fn)
+				pt := field.Type().ProtoType()
+				srcName := field.Name().UpperCamelCase().String()
+				srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
+				if !first {
+					paginationStmts = append(paginationStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+						jen.Lit(":"),
+					))
+				}
+				first = false
+				switch {
+				case pt == pgs.StringT:
+					paginationStmts = append(paginationStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+						srcFunc,
+					))
+				case pt.IsNumeric() || pt == pgs.EnumT:
+					fmtCall := numberFormatStatement(pt, srcFunc)
+					paginationStmts = append(paginationStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+						fmtCall,
+					))
+				default:
+					panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
+				}
+			}
+
+			// Add the provided shard at the end
+			paginationStmts = append(paginationStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+				jen.Lit(":"),
+			))
+			paginationStmts = append(paginationStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+				jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id("shard")), jen.Lit(10)),
+			))
+
+			paginationStmts = append(paginationStmts,
+				jen.Return(jen.Id("sb").Dot("String").Call()),
+			)
+
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id(funcSuffix + "PaginationKeyWithShard").Params(jen.Id("shard").Uint32()).List(jen.String()).Block(
+				paginationStmts...,
+			).Line()
+
+			// PaginationKeysWithShard() []string - returns all possible sharded keys
+			var allKeysStmts []jen.Code
+			allKeysStmts = append(allKeysStmts,
+				jen.Id("keys").Op(":=").Make(jen.Index().String(), jen.Lit(0), jen.Lit(ck.Shard.ShardCount)),
+			)
+			allKeysStmts = append(allKeysStmts,
+				jen.For(jen.Id("i").Op(":=").Uint32().Call(jen.Lit(0)), jen.Id("i").Op("<").Lit(ck.Shard.ShardCount), jen.Id("i").Op("++")).Block(
+					jen.Id("keys").Op("=").Append(jen.Id("keys"), jen.Id("p").Dot(funcSuffix+"PaginationKeyWithShard").Call(jen.Id("i"))),
+				),
+			)
+			allKeysStmts = append(allKeysStmts,
+				jen.Return(jen.Id("keys")),
+			)
+
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id(funcSuffix + "PaginationKeysWithShard").Params().List(jen.Index().String()).Block(
+				allKeysStmts...,
 			).Line()
 		}
 	}
@@ -518,16 +601,11 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 	// Calculate shard
 	stmts = append(stmts, jen.Id("pkskStr").Op(":=").Id("pkskBuilder").Dot("String").Call())
 	stmts = append(stmts, jen.Id("hash").Op(":=").Qual(cryptoPkg, "Sum256").Call(jen.Index().Byte().Call(jen.Id("pkskStr"))))
-	stmts = append(stmts, jen.Id("hashValue").Op(":=").Uint32().Call(jen.Id("hash").Index(jen.Lit(0))).Op("<<").Lit(24).Op("|").Uint32().Call(jen.Id("hash").Index(jen.Lit(1))).Op("<<").Lit(16).Op("|").Uint32().Call(jen.Id("hash").Index(jen.Lit(2))).Op("<<").Lit(8).Op("|").Uint32().Call(jen.Id("hash").Index(jen.Lit(3))))
-	if shardConfig.ShardCount <= 0 || shardConfig.ShardCount > 64 {
-		panic("generateShardedKeyStringer: shard count must be between 0 and 64")
+	stmts = append(stmts, jen.Id("hashValue").Op(":=").Qual(binaryPkg, "BigEndian").Dot("Uint32").Call(jen.Id("hash").Index(jen.Empty(), jen.Lit(4))))
+	if shardConfig.ShardCount <= 0 || shardConfig.ShardCount > 1024 {
+		panic("generateShardedKeyStringer: shard count must be between 0 and 1024")
 	}
 	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("%").Lit(shardConfig.ShardCount))
-
-	// Set shard field in the struct
-	shardField := fieldByName(msg, shardConfig.ShardField)
-	shardSrcName := shardField.Name().UpperCamelCase().String()
-	stmts = append(stmts, jen.Id("p").Dot(shardSrcName).Op("=").Id("shardId"))
 
 	// Now build the actual partition key with original PK fields first
 	first = true
@@ -587,10 +665,12 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 			continue
 		}
 
-		// Validate shard configuration
-		if err := validateShardConfig(msg, &mext); err != nil {
-			m.Logf("Shard configuration validation failed: %s", err)
-			m.Fail("code generation failed")
+		// Validate shard configuration for each key
+		for _, key := range mext.Key {
+			if err := validateShardConfig(msg, key); err != nil {
+				m.Logf("Shard configuration validation failed: %s", err)
+				m.Fail("code generation failed")
+			}
 		}
 
 		// https://pkg.go.dev/github.com/guregu/dynamo/v2#Marshaler
@@ -735,8 +815,8 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 		vname := fmt.Sprintf("v%d", refId)
 
 		// Use sharded key generation for primary partition key if sharding is enabled
-		if i == 0 && isShardingEnabled(mext) {
-			stmts = generateShardedKeyStringer(msg, stmts, true, ck.PkFields, ck.SkFields, mext.Shard, stringBuffer)
+		if i == 0 && isShardingEnabled(ck) {
+			stmts = generateShardedKeyStringer(msg, stmts, true, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer)
 		} else {
 			stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
 		}

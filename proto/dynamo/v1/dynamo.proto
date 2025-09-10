@@ -18,8 +18,6 @@ message DynamoMessageOptions {
   // A compound value that can be used as a partition and sort key. Multiple
   // keys will be added as gsi keys after the first.
   repeated Key key = 2;
-
-  ShardConfig shard = 3;
 }
 
 message Key {
@@ -28,13 +26,13 @@ message Key {
   // If set, the value of sort key is set to a constant string.  In this case
   // sk_fields is ignored.
   string sk_const = 3;
+  ShardConfig shard = 4;
 }
 
 message ShardConfig {
   // Sharding is opt-in
   bool enabled = 1;
   uint32 shard_count = 2;
-  string shard_field = 3;
 }
 
 extend google.protobuf.FieldOptions {
