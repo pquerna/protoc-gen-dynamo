@@ -605,7 +605,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 	stmts = append(stmts, jen.Id("hash").Op(":=").Qual(cryptoPkg, "Sum256").Call(jen.Index().Byte().Call(jen.Id("pkskStr"))))
 	stmts = append(stmts, jen.Id("hashValue").Op(":=").Qual(binaryPkg, "BigEndian").Dot("Uint32").Call(jen.Id("hash").Index(jen.Empty(), jen.Lit(4))))
 	if shardConfig.ShardCount <= shardMinLimit || shardConfig.ShardCount > shardMaxLimit {
-		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be between %d and %d", shardMinLimit, shardMaxLimit)
+		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be between %d and %d", shardMinLimit, shardMaxLimit))
 	}
 	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("%").Lit(shardConfig.ShardCount))
 
