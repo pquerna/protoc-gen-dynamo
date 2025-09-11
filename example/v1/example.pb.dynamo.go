@@ -610,7 +610,7 @@ func UserGsi2SkKey(idpId *string, anEnum *BasicEnum) string {
 	}).Build().Gsi2SkKey()
 }
 
-func (p *User) PaginationKeyWithShard(shard uint32) string {
+func (p *User) PartitionKeyWithShard(shard uint32) string {
 	var sb strings.Builder
 	_, _ = sb.WriteString("examplepb_v1_user:")
 	_, _ = sb.WriteString(p.GetTenantId())
@@ -619,10 +619,10 @@ func (p *User) PaginationKeyWithShard(shard uint32) string {
 	return sb.String()
 }
 
-func (p *User) PaginationKeysWithShard() []string {
+func (p *User) PartitionKeysWithShard() []string {
 	keys := make([]string, 0, uint32(0x20))
 	for i := uint32(0); i < uint32(0x20); i++ {
-		keys = append(keys, p.PaginationKeyWithShard(i))
+		keys = append(keys, p.PartitionKeyWithShard(i))
 	}
 	return keys
 }
@@ -735,7 +735,7 @@ func (p *UserV2) Gsi1PkKey() string {
 	pkskStr := pkskBuilder.String()
 	hash := sha256.Sum256([]byte(pkskStr))
 	hashValue := binary.BigEndian.Uint32(hash[:4])
-	shardId := hashValue % uint32(0x400)
+	shardId := hashValue % uint32(0x20)
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
@@ -770,7 +770,7 @@ func (p *UserV2) Gsi2PkKey() string {
 	pkskStr := pkskBuilder.String()
 	hash := sha256.Sum256([]byte(pkskStr))
 	hashValue := binary.BigEndian.Uint32(hash[:4])
-	shardId := hashValue % uint32(0x200)
+	shardId := hashValue % uint32(0x20)
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(p.GetIdpId())
@@ -797,7 +797,7 @@ func UserV2Gsi2SkKey(anEnum *BasicEnum) string {
 	return (&UserV2_builder{AnEnum: anEnum}).Build().Gsi2SkKey()
 }
 
-func (p *UserV2) Gsi1PaginationKeyWithShard(shard uint32) string {
+func (p *UserV2) Gsi1PartitionKeyWithShard(shard uint32) string {
 	var sb strings.Builder
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
@@ -806,15 +806,15 @@ func (p *UserV2) Gsi1PaginationKeyWithShard(shard uint32) string {
 	return sb.String()
 }
 
-func (p *UserV2) Gsi1PaginationKeysWithShard() []string {
-	keys := make([]string, 0, uint32(0x400))
-	for i := uint32(0); i < uint32(0x400); i++ {
-		keys = append(keys, p.Gsi1PaginationKeyWithShard(i))
+func (p *UserV2) Gsi1PartitionKeysWithShard() []string {
+	keys := make([]string, 0, uint32(0x20))
+	for i := uint32(0); i < uint32(0x20); i++ {
+		keys = append(keys, p.Gsi1PartitionKeyWithShard(i))
 	}
 	return keys
 }
 
-func (p *UserV2) Gsi2PaginationKeyWithShard(shard uint32) string {
+func (p *UserV2) Gsi2PartitionKeyWithShard(shard uint32) string {
 	var sb strings.Builder
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
@@ -825,10 +825,76 @@ func (p *UserV2) Gsi2PaginationKeyWithShard(shard uint32) string {
 	return sb.String()
 }
 
-func (p *UserV2) Gsi2PaginationKeysWithShard() []string {
-	keys := make([]string, 0, uint32(0x200))
-	for i := uint32(0); i < uint32(0x200); i++ {
-		keys = append(keys, p.Gsi2PaginationKeyWithShard(i))
+func (p *UserV2) Gsi2PartitionKeysWithShard() []string {
+	keys := make([]string, 0, uint32(0x20))
+	for i := uint32(0); i < uint32(0x20); i++ {
+		keys = append(keys, p.Gsi2PartitionKeyWithShard(i))
 	}
 	return keys
+}
+
+func (p *User) GetShardFromPartitionKey() (uint32, error) {
+	pk := p.PartitionKey()
+	parts := strings.Split(pk, ":")
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("invalid key: empty")
+	}
+	lastPart := parts[len(parts)-1]
+	shard, err := strconv.ParseUint(lastPart, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse shard from key: %w", err)
+	}
+	return uint32(shard), nil
+}
+
+func (p *User) GetShardCount() uint32 {
+	return uint32(0x20)
+}
+
+func UserShardCount() uint32 {
+	return uint32(0x20)
+}
+
+func (p *UserV2) GetGsi1ShardFromPartitionKey() (uint32, error) {
+	pk := p.Gsi1PkKey()
+	parts := strings.Split(pk, ":")
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("invalid key: empty")
+	}
+	lastPart := parts[len(parts)-1]
+	shard, err := strconv.ParseUint(lastPart, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse shard from key: %w", err)
+	}
+	return uint32(shard), nil
+}
+
+func (p *UserV2) GetGsi1ShardCount() uint32 {
+	return uint32(0x20)
+}
+
+func UserV2Gsi1ShardCount() uint32 {
+	return uint32(0x20)
+}
+
+func (p *UserV2) GetGsi2ShardFromPartitionKey() (uint32, error) {
+	pk := p.Gsi2PkKey()
+	parts := strings.Split(pk, ":")
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("invalid key: empty")
+	}
+	lastPart := parts[len(parts)-1]
+	shard, err := strconv.ParseUint(lastPart, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse shard from key: %w", err)
+	}
+	return uint32(shard), nil
+}
+
+func (p *UserV2) GetGsi2ShardCount() uint32 {
+	return uint32(0x20)
+}
+
+func UserV2Gsi2ShardCount() uint32 {
+	return uint32(0x20)
 }

@@ -1698,7 +1698,7 @@ const file_v1_example_proto_rawDesc = "" +
 	"\x02id\n" +
 	"\acountry\n" +
 	"\x03foo\x1a\n" +
-	"dummyvalue\"\xc0\x03\n" +
+	"dummyvalue\"\xbe\x03\n" +
 	"\x06UserV2\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x129\n" +
@@ -1711,11 +1711,11 @@ const file_v1_example_proto_rawDesc = "" +
 	"\x06idp_id\x18\x06 \x01(\tR\x05idpId\x12!\n" +
 	"\fdisplay_name\x18\a \x01(\tR\vdisplayName\x12\x14\n" +
 	"\x05email\x18\b \x01(\tR\x05email\x120\n" +
-	"\aan_enum\x18\t \x01(\x0e2\x17.examplepb.v1.BasicEnumR\x06anEnum:V\x82\xf7\x02R\x12\x0f\n" +
-	"\ttenant_id\x12\x02id\x12\x1a\n" +
-	"\ttenant_id\x12\x06idp_id\"\x05\b\x01\x10\x80\b\x12#\n" +
+	"\aan_enum\x18\t \x01(\x0e2\x17.examplepb.v1.BasicEnumR\x06anEnum:T\x82\xf7\x02P\x12\x0f\n" +
+	"\ttenant_id\x12\x02id\x12\x19\n" +
+	"\ttenant_id\x12\x06idp_id\"\x04\b\x01\x10 \x12\"\n" +
 	"\ttenant_id\n" +
-	"\x06idp_id\x12\aan_enum\"\x05\b\x01\x10\x80\x04*\"\n" +
+	"\x06idp_id\x12\aan_enum\"\x04\b\x01\x10 *\"\n" +
 	"\tBasicEnum\x12\t\n" +
 	"\x05First\x10\x00\x12\n" +
 	"\n" +

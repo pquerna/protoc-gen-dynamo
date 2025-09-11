@@ -149,6 +149,11 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 		return err
 	}
 
+	err = m.applyUtilityFuncs(f, in)
+	if err != nil {
+		return err
+	}
+
 	return f.Render(buf)
 }
 
@@ -402,7 +407,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				funcSuffix = fmt.Sprintf("Gsi%d", i)
 			}
 
-			// PaginationKeyWithShard(shard uint32) string
+			// PartitionKeyWithShard(shard uint32) string
 			var paginationStmts []jen.Code
 			paginationStmts = append(paginationStmts,
 				jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
@@ -456,18 +461,18 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 			f.Func().Params(
 				jen.Id("p").Op("*").Id(structName.String()),
-			).Id(funcSuffix + "PaginationKeyWithShard").Params(jen.Id("shard").Uint32()).List(jen.String()).Block(
+			).Id(funcSuffix + "PartitionKeyWithShard").Params(jen.Id("shard").Uint32()).List(jen.String()).Block(
 				paginationStmts...,
 			).Line()
 
-			// PaginationKeysWithShard() []string - returns all possible sharded keys
+			// PartitionKeysWithShard() []string - returns all possible sharded keys
 			var allKeysStmts []jen.Code
 			allKeysStmts = append(allKeysStmts,
 				jen.Id("keys").Op(":=").Make(jen.Index().String(), jen.Lit(0), jen.Lit(ck.Shard.ShardCount)),
 			)
 			allKeysStmts = append(allKeysStmts,
 				jen.For(jen.Id("i").Op(":=").Uint32().Call(jen.Lit(0)), jen.Id("i").Op("<").Lit(ck.Shard.ShardCount), jen.Id("i").Op("++")).Block(
-					jen.Id("keys").Op("=").Append(jen.Id("keys"), jen.Id("p").Dot(funcSuffix+"PaginationKeyWithShard").Call(jen.Id("i"))),
+					jen.Id("keys").Op("=").Append(jen.Id("keys"), jen.Id("p").Dot(funcSuffix+"PartitionKeyWithShard").Call(jen.Id("i"))),
 				),
 			)
 			allKeysStmts = append(allKeysStmts,
@@ -476,11 +481,80 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 			f.Func().Params(
 				jen.Id("p").Op("*").Id(structName.String()),
-			).Id(funcSuffix + "PaginationKeysWithShard").Params().List(jen.Index().String()).Block(
+			).Id(funcSuffix + "PartitionKeysWithShard").Params().List(jen.Index().String()).Block(
 				allKeysStmts...,
 			).Line()
 		}
 	}
+	return nil
+}
+
+func (m *Module) applyUtilityFuncs(f *jen.File, in pgs.File) error {
+	for _, msg := range in.AllMessages() {
+		structName := m.ctx.Name(msg)
+		mext := dynamopb.DynamoMessageOptions{}
+		ok, err := msg.Extension(dynamopb.E_Msg, &mext)
+		if err != nil {
+			m.Logf("Parsing dynamo.msg.disabled failed: %s", err)
+			m.Fail("code generation failed")
+		}
+		if ok && mext.Disabled {
+			m.Logf("dynamo.msg disabled for %s", structName)
+			continue
+		}
+
+		// Generate shard utility functions for each sharded key
+		for i, ck := range mext.Key {
+			if !isShardingEnabled(ck) {
+				continue
+			}
+
+			// Determine function name suffix based on key index
+			var funcSuffix string
+			if i == 0 {
+				funcSuffix = ""
+			} else {
+				funcSuffix = fmt.Sprintf("Gsi%d", i)
+			}
+
+			// GetShardFromPartitionKey() (uint32, error) - extracts shard from actual PK
+			var pkFuncName string
+			if i == 0 {
+				pkFuncName = "PartitionKey"
+			} else {
+				pkFuncName = fmt.Sprintf("Gsi%dPkKey", i)
+			}
+
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id(fmt.Sprintf("Get%sShardFromPartitionKey", funcSuffix)).Params().Params(jen.Uint32(), jen.Error()).Block(
+				jen.Id("pk").Op(":=").Id("p").Dot(pkFuncName).Call(),
+				jen.Id("parts").Op(":=").Qual(stringsPkg, "Split").Call(jen.Id("pk"), jen.Lit(":")),
+				jen.If(jen.Len(jen.Id("parts")).Op("==").Lit(0)).Block(
+					jen.Return(jen.Lit(0), jen.Qual(fmtPkg, "Errorf").Call(jen.Lit("invalid key: empty"))),
+				),
+				jen.Id("lastPart").Op(":=").Id("parts").Index(jen.Len(jen.Id("parts")).Op("-").Lit(1)),
+				jen.List(jen.Id("shard"), jen.Id("err")).Op(":=").Qual(strconvPkg, "ParseUint").Call(jen.Id("lastPart"), jen.Lit(10), jen.Lit(32)),
+				jen.If(jen.Id("err").Op("!=").Nil()).Block(
+					jen.Return(jen.Lit(0), jen.Qual(fmtPkg, "Errorf").Call(jen.Lit("failed to parse shard from key: %w"), jen.Id("err"))),
+				),
+				jen.Return(jen.Uint32().Call(jen.Id("shard")), jen.Nil()),
+			).Line()
+
+			// GetShardCount() uint32 - returns the hard-coded shard count
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id(fmt.Sprintf("Get%sShardCount", funcSuffix)).Params().Uint32().Block(
+				jen.Return(jen.Lit(ck.Shard.ShardCount)),
+			).Line()
+
+			// Static function versions that don't need an instance
+			f.Func().Id(fmt.Sprintf("%s%sShardCount", structName.String(), funcSuffix)).Params().Uint32().Block(
+				jen.Return(jen.Lit(ck.Shard.ShardCount)),
+			).Line()
+		}
+	}
+
 	return nil
 }
 

@@ -148,7 +148,7 @@ message UserV2 {
     sk_fields: ["idp_id"]
     shard: {
       enabled: true
-      shard_count: 1024
+      shard_count: 32
     }
   };
   option (dynamo.v1.msg).key = {
@@ -158,7 +158,7 @@ message UserV2 {
     ]
     shard: {
       enabled: true
-      shard_count: 512
+      shard_count: 32
     }
   };
   string tenant_id = 1;
