@@ -2,8 +2,6 @@ package pgd
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"strings"
@@ -78,19 +76,10 @@ const (
 	fmtPkg       = "fmt"
 	timePkg      = "time"
 	protozstdPkg = "github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
-	cryptoPkg    = "crypto/sha256"
-	binaryPkg    = "encoding/binary"
+	xxhashPkg    = "github.com/cespare/xxhash/v2"
 
 	timestampType = "google.protobuf.Timestamp"
 )
-
-// calculateShard computes the shard ID based on PK:SK using SHA256 hash
-func calculateShard(pkSk string, shardCount uint32) uint32 {
-	hash := sha256.Sum256([]byte(pkSk))
-	// Use first 4 bytes as uint32 (BIG ENDIAN)
-	hashValue := binary.BigEndian.Uint32(hash[:4])
-	return hashValue % shardCount
-}
 
 // isShardingEnabled checks if sharding is enabled for a key
 func isShardingEnabled(key *dynamopb.Key) bool {
@@ -131,8 +120,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(stringsPkg, "strings")
 	f.ImportName(timePkg, "time")
 	f.ImportName(protozstdPkg, "protozstd")
-	f.ImportName(cryptoPkg, "sha256")
-	f.ImportName(binaryPkg, "binary")
+	f.ImportName(xxhashPkg, "xxhash")
 
 	err := m.applyMarshal(f, in)
 	if err != nil {
@@ -676,8 +664,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 
 	// Calculate shard
 	stmts = append(stmts, jen.Id("pkskStr").Op(":=").Id("pkskBuilder").Dot("String").Call())
-	stmts = append(stmts, jen.Id("hash").Op(":=").Qual(cryptoPkg, "Sum256").Call(jen.Index().Byte().Call(jen.Id("pkskStr"))))
-	stmts = append(stmts, jen.Id("hashValue").Op(":=").Qual(binaryPkg, "BigEndian").Dot("Uint32").Call(jen.Id("hash").Index(jen.Empty(), jen.Lit(4))))
+	stmts = append(stmts, jen.Id("hashValue").Op(":=").Uint32().Call(jen.Qual(xxhashPkg, "Sum64String").Call(jen.Id("pkskStr"))))
 	if shardConfig.ShardCount <= shardMinLimit || shardConfig.ShardCount > shardMaxLimit {
 		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be between %d and %d", shardMinLimit, shardMaxLimit))
 	}

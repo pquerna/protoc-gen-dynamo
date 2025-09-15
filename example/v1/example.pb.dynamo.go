@@ -4,10 +4,9 @@
 package v1
 
 import (
-	"crypto/sha256"
-	"encoding/binary"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/cespare/xxhash/v2"
 	"github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
 	"strconv"
 	"strings"
@@ -111,8 +110,7 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	_, _ = pkskBuilder.WriteString(":")
 	_, _ = pkskBuilder.WriteString(p.GetId())
 	pkskStr := pkskBuilder.String()
-	hash := sha256.Sum256([]byte(pkskStr))
-	hashValue := binary.BigEndian.Uint32(hash[:4])
+	hashValue := uint32(xxhash.Sum64String(pkskStr))
 	shardId := hashValue % uint32(0x20)
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
@@ -535,8 +533,7 @@ func (p *User) PartitionKey() string {
 	_, _ = pkskBuilder.WriteString(":")
 	_, _ = pkskBuilder.WriteString(p.GetId())
 	pkskStr := pkskBuilder.String()
-	hash := sha256.Sum256([]byte(pkskStr))
-	hashValue := binary.BigEndian.Uint32(hash[:4])
+	hashValue := uint32(xxhash.Sum64String(pkskStr))
 	shardId := hashValue % uint32(0x20)
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
@@ -733,8 +730,7 @@ func (p *UserV2) Gsi1PkKey() string {
 	_, _ = pkskBuilder.WriteString(":")
 	_, _ = pkskBuilder.WriteString(p.GetIdpId())
 	pkskStr := pkskBuilder.String()
-	hash := sha256.Sum256([]byte(pkskStr))
-	hashValue := binary.BigEndian.Uint32(hash[:4])
+	hashValue := uint32(xxhash.Sum64String(pkskStr))
 	shardId := hashValue % uint32(0x20)
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
@@ -768,8 +764,7 @@ func (p *UserV2) Gsi2PkKey() string {
 	_, _ = pkskBuilder.WriteString(":")
 	_, _ = pkskBuilder.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	pkskStr := pkskBuilder.String()
-	hash := sha256.Sum256([]byte(pkskStr))
-	hashValue := binary.BigEndian.Uint32(hash[:4])
+	hashValue := uint32(xxhash.Sum64String(pkskStr))
 	shardId := hashValue % uint32(0x20)
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")

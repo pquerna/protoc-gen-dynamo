@@ -4,6 +4,7 @@ go 1.24
 
 require (
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.43.1
+	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/dave/jennifer v1.7.1
 	github.com/klauspost/compress v1.18.0
 	github.com/lyft/protoc-gen-star/v2 v2.0.4
