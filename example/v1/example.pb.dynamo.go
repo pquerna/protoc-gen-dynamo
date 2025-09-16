@@ -788,7 +788,7 @@ func (p *UserV2) Gsi2PkKey() string {
 	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	pkskStr := sb.String()
 	hashValue := xxhash.Sum64String(pkskStr)
-	shardId := uint32(hashValue & 31)
+	shardId := uint32(hashValue & 63)
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
@@ -846,8 +846,8 @@ func (p *UserV2) Gsi2PartitionKeyWithShard(shard uint32) string {
 }
 
 func (p *UserV2) Gsi2PartitionKeysWithShard() []string {
-	keys := make([]string, 0, 32)
-	for i := uint32(0); i < 32; i++ {
+	keys := make([]string, 0, 64)
+	for i := uint32(0); i < 64; i++ {
 		keys = append(keys, p.Gsi2PartitionKeyWithShard(i))
 	}
 	return keys
@@ -912,9 +912,9 @@ func (p *UserV2) GetGsi2ShardFromPartitionKey() (uint32, error) {
 }
 
 func (p *UserV2) GetGsi2ShardCount() uint32 {
-	return 32
+	return 64
 }
 
 func UserV2Gsi2ShardCount() uint32 {
-	return 32
+	return 64
 }

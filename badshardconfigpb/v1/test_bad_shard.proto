@@ -53,3 +53,17 @@ message BadUser2 {
   string tenant_id = 1;
   string id = 2;
 }
+
+// Test case 4: shard_count not a power of 2
+message BadUser3 {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+    shard: {
+      enabled: true
+      shard_count: 5  // should cause validation error not a power of 2
+    }
+  };
+  string tenant_id = 1;
+  string id = 2;
+}

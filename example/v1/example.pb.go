@@ -1683,7 +1683,7 @@ const file_v1_example_proto_rawDesc = "" +
 	"\ttenant_id\x12\x02id\x12 \n" +
 	"\ttenant_id\x12\x06idp_id\x12\x05email\"\x04\b\x01\x10 \x12\"\n" +
 	"\ttenant_id\n" +
-	"\x06idp_id\x12\aan_enum\"\x04\b\x01\x10 *\"\n" +
+	"\x06idp_id\x12\aan_enum\"\x04\b\x01\x10@*\"\n" +
 	"\tBasicEnum\x12\t\n" +
 	"\x05First\x10\x00\x12\n" +
 	"\n" +

@@ -157,7 +157,7 @@ message UserV2 {
     ]
     shard: {
       enabled: true
-      shard_count: 32
+      shard_count: 64
     }
   };
   string tenant_id = 1;
