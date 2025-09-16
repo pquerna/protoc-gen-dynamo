@@ -26,13 +26,16 @@ message Key {
   // If set, the value of sort key is set to a constant string.  In this case
   // sk_fields is ignored.
   string sk_const = 3;
-  ShardConfig shard = 4;
+  ShardOptions shard = 4;
 }
 
-message ShardConfig {
+message ShardOptions {
   // Sharding is opt-in
   bool enabled = 1;
   uint32 shard_count = 2;
+  // When strict is true, validation will ensure sort key fields are not empty for sharded records when calling PartitionKey()
+  // If validation fails it panics
+  bool strict = 3;
 }
 
 extend google.protobuf.FieldOptions {

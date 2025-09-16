@@ -265,6 +265,8 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	v3 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetEmail())
 	v4 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
@@ -725,10 +727,18 @@ func (p *UserV2) Gsi1PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	if len(p.GetIdpId()) == 0 {
+		panic(fmt.Sprintf("sharded key with strict=true: sort key field '%s' cannot be empty", "idp_id"))
+	}
+	if len(p.GetEmail()) == 0 {
+		panic(fmt.Sprintf("sharded key with strict=true: sort key field '%s' cannot be empty", "email"))
+	}
 	var pkskBuilder strings.Builder
 	_, _ = pkskBuilder.WriteString(p.GetTenantId())
 	_, _ = pkskBuilder.WriteString(":")
 	_, _ = pkskBuilder.WriteString(p.GetIdpId())
+	_, _ = pkskBuilder.WriteString(":")
+	_, _ = pkskBuilder.WriteString(p.GetEmail())
 	pkskStr := pkskBuilder.String()
 	hashValue := uint32(xxhash.Sum64String(pkskStr))
 	shardId := hashValue % uint32(0x20)
@@ -746,11 +756,16 @@ func (p *UserV2) Gsi1SkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetEmail())
 	return sb.String()
 }
 
-func UserV2Gsi1SkKey(idpId *string) string {
-	return (&UserV2_builder{IdpId: idpId}).Build().Gsi1SkKey()
+func UserV2Gsi1SkKey(idpId *string, email *string) string {
+	return (&UserV2_builder{
+		Email: email,
+		IdpId: idpId,
+	}).Build().Gsi1SkKey()
 }
 
 func (p *UserV2) Gsi2PkKey() string {

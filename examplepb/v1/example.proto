@@ -144,10 +144,11 @@ message UserV2 {
   };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
-    sk_fields: ["idp_id"]
+    sk_fields: ["idp_id", "email"]
     shard: {
       enabled: true
       shard_count: 32
+      strict: true
     }
   };
   option (dynamo.v1.msg).key = {

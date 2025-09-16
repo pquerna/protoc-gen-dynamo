@@ -101,6 +101,13 @@ func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
 		return fmt.Errorf("shard_count must be <= %d for message %s (got %d)", shardMaxLimit, msg.FullyQualifiedName(), key.Shard.ShardCount)
 	}
 
+	// If strict mode is enabled, validate that sort key is properly configured
+	if key.Shard.Strict {
+		if len(key.SkFields) == 0 && key.SkConst == "" {
+			return fmt.Errorf("sharded key with strict=true must have sort key configured (either sk_fields or sk_const) for message %s", msg.FullyQualifiedName())
+		}
+	}
+
 	return nil
 }
 
@@ -587,7 +594,7 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, fiel
 }
 
 // generateShardedKeyStringer generates a sharded partition key by calculating shard based on PK:SK
-func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, pkFields []string, skFields []string, shardConfig *dynamopb.ShardConfig, stringBuffer string) []jen.Code {
+func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, pkFields []string, skFields []string, shardConfig *dynamopb.ShardOptions, stringBuffer string) []jen.Code {
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
 	sep := ":"
 	prefix := ""
@@ -596,6 +603,31 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 			jen.Lit(prefix+sep),
 		))
+	}
+
+	// Add runtime validation for strict mode
+	if shardConfig.Strict && len(skFields) > 0 {
+		for _, fn := range skFields {
+			field := fieldByName(msg, fn)
+			pt := field.Type().ProtoType()
+			srcName := field.Name().UpperCamelCase().String()
+			srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
+
+			switch {
+			case pt == pgs.StringT:
+				stmts = append(stmts,
+					jen.If(jen.Len(srcFunc).Op("==").Lit(0)).Block(
+						jen.Panic(jen.Qual(fmtPkg, "Sprintf").Call(
+							jen.Lit("sharded key with strict=true: sort key field '%s' cannot be empty"),
+							jen.Lit(fn),
+						)),
+					),
+				)
+			case pt.IsNumeric() || pt == pgs.EnumT:
+				// For numeric types, check if they are zero values (which might be valid)
+				// We could add validation here if needed, but zero values are typically valid for numbers
+			}
+		}
 	}
 
 	// First, compute PK:SK for sharding

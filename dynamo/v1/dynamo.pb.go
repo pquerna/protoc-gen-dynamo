@@ -83,8 +83,8 @@ type Key struct {
 	SkFields []string               `protobuf:"bytes,2,rep,name=sk_fields,json=skFields,proto3" json:"sk_fields,omitempty"`
 	// If set, the value of sort key is set to a constant string.  In this case
 	// sk_fields is ignored.
-	SkConst       string       `protobuf:"bytes,3,opt,name=sk_const,json=skConst,proto3" json:"sk_const,omitempty"`
-	Shard         *ShardConfig `protobuf:"bytes,4,opt,name=shard,proto3" json:"shard,omitempty"`
+	SkConst       string        `protobuf:"bytes,3,opt,name=sk_const,json=skConst,proto3" json:"sk_const,omitempty"`
+	Shard         *ShardOptions `protobuf:"bytes,4,opt,name=shard,proto3" json:"shard,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -140,36 +140,38 @@ func (x *Key) GetSkConst() string {
 	return ""
 }
 
-func (x *Key) GetShard() *ShardConfig {
+func (x *Key) GetShard() *ShardOptions {
 	if x != nil {
 		return x.Shard
 	}
 	return nil
 }
 
-type ShardConfig struct {
+type ShardOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Sharding is opt-in
-	Enabled       bool   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	ShardCount    uint32 `protobuf:"varint,2,opt,name=shard_count,json=shardCount,proto3" json:"shard_count,omitempty"`
+	Enabled    bool   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	ShardCount uint32 `protobuf:"varint,2,opt,name=shard_count,json=shardCount,proto3" json:"shard_count,omitempty"`
+	// When strict is true, validation will ensure sort key fields are not empty for sharded records when calling PartitionKey()
+	Strict        bool `protobuf:"varint,3,opt,name=strict,proto3" json:"strict,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ShardConfig) Reset() {
-	*x = ShardConfig{}
+func (x *ShardOptions) Reset() {
+	*x = ShardOptions{}
 	mi := &file_dynamo_v1_dynamo_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ShardConfig) String() string {
+func (x *ShardOptions) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ShardConfig) ProtoMessage() {}
+func (*ShardOptions) ProtoMessage() {}
 
-func (x *ShardConfig) ProtoReflect() protoreflect.Message {
+func (x *ShardOptions) ProtoReflect() protoreflect.Message {
 	mi := &file_dynamo_v1_dynamo_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -181,23 +183,30 @@ func (x *ShardConfig) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ShardConfig.ProtoReflect.Descriptor instead.
-func (*ShardConfig) Descriptor() ([]byte, []int) {
+// Deprecated: Use ShardOptions.ProtoReflect.Descriptor instead.
+func (*ShardOptions) Descriptor() ([]byte, []int) {
 	return file_dynamo_v1_dynamo_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ShardConfig) GetEnabled() bool {
+func (x *ShardOptions) GetEnabled() bool {
 	if x != nil {
 		return x.Enabled
 	}
 	return false
 }
 
-func (x *ShardConfig) GetShardCount() uint32 {
+func (x *ShardOptions) GetShardCount() uint32 {
 	if x != nil {
 		return x.ShardCount
 	}
 	return 0
+}
+
+func (x *ShardOptions) GetStrict() bool {
+	if x != nil {
+		return x.Strict
+	}
+	return false
 }
 
 type DynamoFieldOptions struct {
@@ -366,16 +375,17 @@ const file_dynamo_v1_dynamo_proto_rawDesc = "" +
 	"\x16dynamo/v1/dynamo.proto\x12\tdynamo.v1\x1a google/protobuf/descriptor.proto\"T\n" +
 	"\x14DynamoMessageOptions\x12\x1a\n" +
 	"\bdisabled\x18\x01 \x01(\bR\bdisabled\x12 \n" +
-	"\x03key\x18\x02 \x03(\v2\x0e.dynamo.v1.KeyR\x03key\"\x88\x01\n" +
+	"\x03key\x18\x02 \x03(\v2\x0e.dynamo.v1.KeyR\x03key\"\x89\x01\n" +
 	"\x03Key\x12\x1b\n" +
 	"\tpk_fields\x18\x01 \x03(\tR\bpkFields\x12\x1b\n" +
 	"\tsk_fields\x18\x02 \x03(\tR\bskFields\x12\x19\n" +
-	"\bsk_const\x18\x03 \x01(\tR\askConst\x12,\n" +
-	"\x05shard\x18\x04 \x01(\v2\x16.dynamo.v1.ShardConfigR\x05shard\"H\n" +
-	"\vShardConfig\x12\x18\n" +
+	"\bsk_const\x18\x03 \x01(\tR\askConst\x12-\n" +
+	"\x05shard\x18\x04 \x01(\v2\x17.dynamo.v1.ShardOptionsR\x05shard\"a\n" +
+	"\fShardOptions\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x1f\n" +
 	"\vshard_count\x18\x02 \x01(\rR\n" +
-	"shardCount\"f\n" +
+	"shardCount\x12\x16\n" +
+	"\x06strict\x18\x03 \x01(\bR\x06strict\"f\n" +
 	"\x12DynamoFieldOptions\x12\x16\n" +
 	"\x06expose\x18\x01 \x01(\bR\x06expose\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12$\n" +
@@ -408,7 +418,7 @@ var file_dynamo_v1_dynamo_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_dynamo_v1_dynamo_proto_goTypes = []any{
 	(*DynamoMessageOptions)(nil),        // 0: dynamo.v1.DynamoMessageOptions
 	(*Key)(nil),                         // 1: dynamo.v1.Key
-	(*ShardConfig)(nil),                 // 2: dynamo.v1.ShardConfig
+	(*ShardOptions)(nil),                // 2: dynamo.v1.ShardOptions
 	(*DynamoFieldOptions)(nil),          // 3: dynamo.v1.DynamoFieldOptions
 	(*Types)(nil),                       // 4: dynamo.v1.Types
 	(*descriptorpb.MessageOptions)(nil), // 5: google.protobuf.MessageOptions
@@ -416,7 +426,7 @@ var file_dynamo_v1_dynamo_proto_goTypes = []any{
 }
 var file_dynamo_v1_dynamo_proto_depIdxs = []int32{
 	1, // 0: dynamo.v1.DynamoMessageOptions.key:type_name -> dynamo.v1.Key
-	2, // 1: dynamo.v1.Key.shard:type_name -> dynamo.v1.ShardConfig
+	2, // 1: dynamo.v1.Key.shard:type_name -> dynamo.v1.ShardOptions
 	4, // 2: dynamo.v1.DynamoFieldOptions.type:type_name -> dynamo.v1.Types
 	5, // 3: dynamo.v1.msg:extendee -> google.protobuf.MessageOptions
 	6, // 4: dynamo.v1.field:extendee -> google.protobuf.FieldOptions
