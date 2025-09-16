@@ -108,13 +108,14 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	if len(p.GetId()) == 0 {
 		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "id"))
 	}
-	var pkskBuilder strings.Builder
-	_, _ = pkskBuilder.WriteString(p.GetTenantId())
-	_, _ = pkskBuilder.WriteString(":")
-	_, _ = pkskBuilder.WriteString(p.GetId())
-	pkskStr := pkskBuilder.String()
-	hashValue := uint32(xxhash.Sum64String(pkskStr))
-	shardId := hashValue % 32
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetId())
+	pkskStr := sb.String()
+	hashValue := xxhash.Sum64String(pkskStr)
+	shardId := uint32(hashValue & 31)
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user:")
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
@@ -536,13 +537,14 @@ func (p *User) PartitionKey() string {
 	if len(p.GetId()) == 0 {
 		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "id"))
 	}
-	var pkskBuilder strings.Builder
-	_, _ = pkskBuilder.WriteString(p.GetTenantId())
-	_, _ = pkskBuilder.WriteString(":")
-	_, _ = pkskBuilder.WriteString(p.GetId())
-	pkskStr := pkskBuilder.String()
-	hashValue := uint32(xxhash.Sum64String(pkskStr))
-	shardId := hashValue % 32
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetId())
+	pkskStr := sb.String()
+	hashValue := xxhash.Sum64String(pkskStr)
+	shardId := uint32(hashValue & 31)
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user:")
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
@@ -739,15 +741,16 @@ func (p *UserV2) Gsi1PkKey() string {
 	if len(p.GetEmail()) == 0 {
 		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "email"))
 	}
-	var pkskBuilder strings.Builder
-	_, _ = pkskBuilder.WriteString(p.GetTenantId())
-	_, _ = pkskBuilder.WriteString(":")
-	_, _ = pkskBuilder.WriteString(p.GetIdpId())
-	_, _ = pkskBuilder.WriteString(":")
-	_, _ = pkskBuilder.WriteString(p.GetEmail())
-	pkskStr := pkskBuilder.String()
-	hashValue := uint32(xxhash.Sum64String(pkskStr))
-	shardId := hashValue % 32
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetEmail())
+	pkskStr := sb.String()
+	hashValue := xxhash.Sum64String(pkskStr)
+	shardId := uint32(hashValue & 31)
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
@@ -778,15 +781,16 @@ func (p *UserV2) Gsi2PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
-	var pkskBuilder strings.Builder
-	_, _ = pkskBuilder.WriteString(p.GetTenantId())
-	_, _ = pkskBuilder.WriteString(":")
-	_, _ = pkskBuilder.WriteString(p.GetIdpId())
-	_, _ = pkskBuilder.WriteString(":")
-	_, _ = pkskBuilder.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
-	pkskStr := pkskBuilder.String()
-	hashValue := uint32(xxhash.Sum64String(pkskStr))
-	shardId := hashValue % 32
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
+	pkskStr := sb.String()
+	hashValue := xxhash.Sum64String(pkskStr)
+	shardId := uint32(hashValue & 31)
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(p.GetIdpId())

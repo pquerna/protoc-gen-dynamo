@@ -715,6 +715,14 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 
 	// Reset the buffer to build the actual partition key with original PK fields first
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
+
+	// Add prefix back for the final partition key
+	if addPrefix {
+		stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
+			jen.Lit(prefix+sep),
+		))
+	}
+
 	first = true
 	for _, fn := range pkFields {
 		field := fieldByName(msg, fn)
