@@ -461,10 +461,10 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 			// PartitionKeysWithShard() []string - returns all possible sharded keys
 			var allKeysStmts []jen.Code
 			allKeysStmts = append(allKeysStmts,
-				jen.Id("keys").Op(":=").Make(jen.Index().String(), jen.Lit(0), jen.Lit(ck.Shard.ShardCount)),
+				jen.Id("keys").Op(":=").Make(jen.Index().String(), jen.Lit(0), jen.Lit(int(ck.Shard.ShardCount))),
 			)
 			allKeysStmts = append(allKeysStmts,
-				jen.For(jen.Id("i").Op(":=").Uint32().Call(jen.Lit(0)), jen.Id("i").Op("<").Lit(ck.Shard.ShardCount), jen.Id("i").Op("++")).Block(
+				jen.For(jen.Id("i").Op(":=").Uint32().Call(jen.Lit(0)), jen.Id("i").Op("<").Lit(int(ck.Shard.ShardCount)), jen.Id("i").Op("++")).Block(
 					jen.Id("keys").Op("=").Append(jen.Id("keys"), jen.Id("p").Dot(funcSuffix+"PartitionKeyWithShard").Call(jen.Id("i"))),
 				),
 			)
@@ -538,12 +538,12 @@ func (m *Module) applyUtilityFuncs(f *jen.File, in pgs.File) error {
 			f.Func().Params(
 				jen.Id("p").Op("*").Id(structName.String()),
 			).Id(fmt.Sprintf("Get%sShardCount", funcSuffix)).Params().Uint32().Block(
-				jen.Return(jen.Lit(ck.Shard.ShardCount)),
+				jen.Return(jen.Lit(int(ck.Shard.ShardCount))),
 			).Line()
 
 			// Static function versions that don't need an instance
 			f.Func().Id(fmt.Sprintf("%s%sShardCount", structName.String(), funcSuffix)).Params().Uint32().Block(
-				jen.Return(jen.Lit(ck.Shard.ShardCount)),
+				jen.Return(jen.Lit(int(ck.Shard.ShardCount))),
 			).Line()
 		}
 	}
@@ -698,7 +698,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 	if shardConfig.ShardCount <= shardMinLimit || shardConfig.ShardCount > shardMaxLimit {
 		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be between %d and %d", shardMinLimit, shardMaxLimit))
 	}
-	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("%").Lit(shardConfig.ShardCount))
+	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("%").Lit(int(shardConfig.ShardCount)))
 
 	// Now build the actual partition key with original PK fields first
 	first = true

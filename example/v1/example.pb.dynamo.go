@@ -114,7 +114,7 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	_, _ = pkskBuilder.WriteString(p.GetId())
 	pkskStr := pkskBuilder.String()
 	hashValue := uint32(xxhash.Sum64String(pkskStr))
-	shardId := hashValue % uint32(0x20)
+	shardId := hashValue % 32
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
@@ -542,7 +542,7 @@ func (p *User) PartitionKey() string {
 	_, _ = pkskBuilder.WriteString(p.GetId())
 	pkskStr := pkskBuilder.String()
 	hashValue := uint32(xxhash.Sum64String(pkskStr))
-	shardId := hashValue % uint32(0x20)
+	shardId := hashValue % 32
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
@@ -625,8 +625,8 @@ func (p *User) PartitionKeyWithShard(shard uint32) string {
 }
 
 func (p *User) PartitionKeysWithShard() []string {
-	keys := make([]string, 0, uint32(0x20))
-	for i := uint32(0); i < uint32(0x20); i++ {
+	keys := make([]string, 0, 32)
+	for i := uint32(0); i < 32; i++ {
 		keys = append(keys, p.PartitionKeyWithShard(i))
 	}
 	return keys
@@ -747,7 +747,7 @@ func (p *UserV2) Gsi1PkKey() string {
 	_, _ = pkskBuilder.WriteString(p.GetEmail())
 	pkskStr := pkskBuilder.String()
 	hashValue := uint32(xxhash.Sum64String(pkskStr))
-	shardId := hashValue % uint32(0x20)
+	shardId := hashValue % 32
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
@@ -786,7 +786,7 @@ func (p *UserV2) Gsi2PkKey() string {
 	_, _ = pkskBuilder.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	pkskStr := pkskBuilder.String()
 	hashValue := uint32(xxhash.Sum64String(pkskStr))
-	shardId := hashValue % uint32(0x20)
+	shardId := hashValue % 32
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(p.GetIdpId())
@@ -823,8 +823,8 @@ func (p *UserV2) Gsi1PartitionKeyWithShard(shard uint32) string {
 }
 
 func (p *UserV2) Gsi1PartitionKeysWithShard() []string {
-	keys := make([]string, 0, uint32(0x20))
-	for i := uint32(0); i < uint32(0x20); i++ {
+	keys := make([]string, 0, 32)
+	for i := uint32(0); i < 32; i++ {
 		keys = append(keys, p.Gsi1PartitionKeyWithShard(i))
 	}
 	return keys
@@ -842,8 +842,8 @@ func (p *UserV2) Gsi2PartitionKeyWithShard(shard uint32) string {
 }
 
 func (p *UserV2) Gsi2PartitionKeysWithShard() []string {
-	keys := make([]string, 0, uint32(0x20))
-	for i := uint32(0); i < uint32(0x20); i++ {
+	keys := make([]string, 0, 32)
+	for i := uint32(0); i < 32; i++ {
 		keys = append(keys, p.Gsi2PartitionKeyWithShard(i))
 	}
 	return keys
@@ -864,11 +864,11 @@ func (p *User) GetShardFromPartitionKey() (uint32, error) {
 }
 
 func (p *User) GetShardCount() uint32 {
-	return uint32(0x20)
+	return 32
 }
 
 func UserShardCount() uint32 {
-	return uint32(0x20)
+	return 32
 }
 
 func (p *UserV2) GetGsi1ShardFromPartitionKey() (uint32, error) {
@@ -886,11 +886,11 @@ func (p *UserV2) GetGsi1ShardFromPartitionKey() (uint32, error) {
 }
 
 func (p *UserV2) GetGsi1ShardCount() uint32 {
-	return uint32(0x20)
+	return 32
 }
 
 func UserV2Gsi1ShardCount() uint32 {
-	return uint32(0x20)
+	return 32
 }
 
 func (p *UserV2) GetGsi2ShardFromPartitionKey() (uint32, error) {
@@ -908,9 +908,9 @@ func (p *UserV2) GetGsi2ShardFromPartitionKey() (uint32, error) {
 }
 
 func (p *UserV2) GetGsi2ShardCount() uint32 {
-	return uint32(0x20)
+	return 32
 }
 
 func UserV2Gsi2ShardCount() uint32 {
-	return uint32(0x20)
+	return 32
 }
