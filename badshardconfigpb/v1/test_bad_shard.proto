@@ -26,14 +26,14 @@ message GoodUser {
   string id = 2;
 }
 
-// Test case 2: shard_count too high (> 1024)
+// Test case 2: shard_count too high (> 128)
 message BadUser1 {
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
     sk_fields: ["id"]
     shard: {
       enabled: true
-      shard_count: 2000  // should cause validation error (> 1024)
+      shard_count: 2000  // should cause validation error (> 128)
     }
   };
   string tenant_id = 1;
