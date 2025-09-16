@@ -33,9 +33,6 @@ message ShardOptions {
   // Sharding is opt-in
   bool enabled = 1;
   uint32 shard_count = 2;
-  // When strict is true, validation will ensure sort key fields are not empty for sharded records when calling PartitionKey()
-  // If validation fails it panics
-  bool strict = 3;
 }
 
 extend google.protobuf.FieldOptions {

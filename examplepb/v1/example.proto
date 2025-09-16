@@ -148,7 +148,6 @@ message UserV2 {
     shard: {
       enabled: true
       shard_count: 32
-      strict: true
     }
   };
   option (dynamo.v1.msg).key = {

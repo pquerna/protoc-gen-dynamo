@@ -150,10 +150,8 @@ func (x *Key) GetShard() *ShardOptions {
 type ShardOptions struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Sharding is opt-in
-	Enabled    bool   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	ShardCount uint32 `protobuf:"varint,2,opt,name=shard_count,json=shardCount,proto3" json:"shard_count,omitempty"`
-	// When strict is true, validation will ensure sort key fields are not empty for sharded records when calling PartitionKey()
-	Strict        bool `protobuf:"varint,3,opt,name=strict,proto3" json:"strict,omitempty"`
+	Enabled       bool   `protobuf:"varint,1,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	ShardCount    uint32 `protobuf:"varint,2,opt,name=shard_count,json=shardCount,proto3" json:"shard_count,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -200,13 +198,6 @@ func (x *ShardOptions) GetShardCount() uint32 {
 		return x.ShardCount
 	}
 	return 0
-}
-
-func (x *ShardOptions) GetStrict() bool {
-	if x != nil {
-		return x.Strict
-	}
-	return false
 }
 
 type DynamoFieldOptions struct {
@@ -380,12 +371,11 @@ const file_dynamo_v1_dynamo_proto_rawDesc = "" +
 	"\tpk_fields\x18\x01 \x03(\tR\bpkFields\x12\x1b\n" +
 	"\tsk_fields\x18\x02 \x03(\tR\bskFields\x12\x19\n" +
 	"\bsk_const\x18\x03 \x01(\tR\askConst\x12-\n" +
-	"\x05shard\x18\x04 \x01(\v2\x17.dynamo.v1.ShardOptionsR\x05shard\"a\n" +
+	"\x05shard\x18\x04 \x01(\v2\x17.dynamo.v1.ShardOptionsR\x05shard\"I\n" +
 	"\fShardOptions\x12\x18\n" +
 	"\aenabled\x18\x01 \x01(\bR\aenabled\x12\x1f\n" +
 	"\vshard_count\x18\x02 \x01(\rR\n" +
-	"shardCount\x12\x16\n" +
-	"\x06strict\x18\x03 \x01(\bR\x06strict\"f\n" +
+	"shardCount\"f\n" +
 	"\x12DynamoFieldOptions\x12\x16\n" +
 	"\x06expose\x18\x01 \x01(\bR\x06expose\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12$\n" +

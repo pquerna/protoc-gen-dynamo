@@ -105,6 +105,9 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	var err error
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
+	if len(p.GetId()) == 0 {
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "id"))
+	}
 	var pkskBuilder strings.Builder
 	_, _ = pkskBuilder.WriteString(p.GetTenantId())
 	_, _ = pkskBuilder.WriteString(":")
@@ -530,6 +533,9 @@ func (p *User) PartitionKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
+	if len(p.GetId()) == 0 {
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "id"))
+	}
 	var pkskBuilder strings.Builder
 	_, _ = pkskBuilder.WriteString(p.GetTenantId())
 	_, _ = pkskBuilder.WriteString(":")
@@ -728,10 +734,10 @@ func (p *UserV2) Gsi1PkKey() string {
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	if len(p.GetIdpId()) == 0 {
-		panic(fmt.Sprintf("sharded key with strict=true: sort key field '%s' cannot be empty", "idp_id"))
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "idp_id"))
 	}
 	if len(p.GetEmail()) == 0 {
-		panic(fmt.Sprintf("sharded key with strict=true: sort key field '%s' cannot be empty", "email"))
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "email"))
 	}
 	var pkskBuilder strings.Builder
 	_, _ = pkskBuilder.WriteString(p.GetTenantId())

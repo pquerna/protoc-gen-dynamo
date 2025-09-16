@@ -101,11 +101,9 @@ func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
 		return fmt.Errorf("shard_count must be <= %d for message %s (got %d)", shardMaxLimit, msg.FullyQualifiedName(), key.Shard.ShardCount)
 	}
 
-	// If strict mode is enabled, validate that sort key is properly configured
-	if key.Shard.Strict {
-		if len(key.SkFields) == 0 && key.SkConst == "" {
-			return fmt.Errorf("sharded key with strict=true must have sort key configured (either sk_fields or sk_const) for message %s", msg.FullyQualifiedName())
-		}
+	// For sharded keys, validate that sort key is properly configured
+	if len(key.SkFields) == 0 && key.SkConst == "" {
+		return fmt.Errorf("sharded key must have sort key configured (either sk_fields or sk_const) for message %s", msg.FullyQualifiedName())
 	}
 
 	return nil
@@ -605,8 +603,8 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		))
 	}
 
-	// Add runtime validation for strict mode
-	if shardConfig.Strict && len(skFields) > 0 {
+	// Add runtime validation for empty sort key fields
+	if len(skFields) > 0 {
 		for _, fn := range skFields {
 			field := fieldByName(msg, fn)
 			pt := field.Type().ProtoType()
@@ -618,7 +616,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 				stmts = append(stmts,
 					jen.If(jen.Len(srcFunc).Op("==").Lit(0)).Block(
 						jen.Panic(jen.Qual(fmtPkg, "Sprintf").Call(
-							jen.Lit("sharded key with strict=true: sort key field '%s' cannot be empty"),
+							jen.Lit("sharded key: sort key field '%s' cannot be empty"),
 							jen.Lit(fn),
 						)),
 					),
