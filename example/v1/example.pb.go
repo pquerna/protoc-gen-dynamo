@@ -523,7 +523,6 @@ type User struct {
 	xxx_hidden_DisplayName *string                `protobuf:"bytes,7,opt,name=display_name,json=displayName"`
 	xxx_hidden_Email       *string                `protobuf:"bytes,8,opt,name=email"`
 	xxx_hidden_AnEnum      BasicEnum              `protobuf:"varint,9,opt,name=an_enum,json=anEnum,enum=examplepb.v1.BasicEnum"`
-	xxx_hidden_ShardId     uint32                 `protobuf:"varint,10,opt,name=shard_id,json=shardId"`
 	XXX_raceDetectHookData protoimpl.RaceDetectHookData
 	XXX_presence           [1]uint32
 	unknownFields          protoimpl.UnknownFields
@@ -635,21 +634,14 @@ func (x *User) GetAnEnum() BasicEnum {
 	return BasicEnum_First
 }
 
-func (x *User) GetShardId() uint32 {
-	if x != nil {
-		return x.xxx_hidden_ShardId
-	}
-	return 0
-}
-
 func (x *User) SetTenantId(v string) {
 	x.xxx_hidden_TenantId = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 10)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 9)
 }
 
 func (x *User) SetId(v string) {
 	x.xxx_hidden_Id = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 10)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 9)
 }
 
 func (x *User) SetCreatedAt(v *timestamppb.Timestamp) {
@@ -666,27 +658,22 @@ func (x *User) SetDeletedAt(v *timestamppb.Timestamp) {
 
 func (x *User) SetIdpId(v string) {
 	x.xxx_hidden_IdpId = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 5, 10)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 5, 9)
 }
 
 func (x *User) SetDisplayName(v string) {
 	x.xxx_hidden_DisplayName = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 6, 10)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 6, 9)
 }
 
 func (x *User) SetEmail(v string) {
 	x.xxx_hidden_Email = &v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 7, 10)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 7, 9)
 }
 
 func (x *User) SetAnEnum(v BasicEnum) {
 	x.xxx_hidden_AnEnum = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 8, 10)
-}
-
-func (x *User) SetShardId(v uint32) {
-	x.xxx_hidden_ShardId = v
-	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 9, 10)
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 8, 9)
 }
 
 func (x *User) HasTenantId() bool {
@@ -752,13 +739,6 @@ func (x *User) HasAnEnum() bool {
 	return protoimpl.X.Present(&(x.XXX_presence[0]), 8)
 }
 
-func (x *User) HasShardId() bool {
-	if x == nil {
-		return false
-	}
-	return protoimpl.X.Present(&(x.XXX_presence[0]), 9)
-}
-
 func (x *User) ClearTenantId() {
 	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
 	x.xxx_hidden_TenantId = nil
@@ -801,11 +781,6 @@ func (x *User) ClearAnEnum() {
 	x.xxx_hidden_AnEnum = BasicEnum_First
 }
 
-func (x *User) ClearShardId() {
-	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 9)
-	x.xxx_hidden_ShardId = 0
-}
-
 type User_builder struct {
 	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
 
@@ -818,7 +793,6 @@ type User_builder struct {
 	DisplayName *string
 	Email       *string
 	AnEnum      *BasicEnum
-	ShardId     *uint32
 }
 
 func (b0 User_builder) Build() *User {
@@ -826,35 +800,31 @@ func (b0 User_builder) Build() *User {
 	b, x := &b0, m0
 	_, _ = b, x
 	if b.TenantId != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 10)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 9)
 		x.xxx_hidden_TenantId = b.TenantId
 	}
 	if b.Id != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 10)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 9)
 		x.xxx_hidden_Id = b.Id
 	}
 	x.xxx_hidden_CreatedAt = b.CreatedAt
 	x.xxx_hidden_UpdatedAt = b.UpdatedAt
 	x.xxx_hidden_DeletedAt = b.DeletedAt
 	if b.IdpId != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 5, 10)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 5, 9)
 		x.xxx_hidden_IdpId = b.IdpId
 	}
 	if b.DisplayName != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 6, 10)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 6, 9)
 		x.xxx_hidden_DisplayName = b.DisplayName
 	}
 	if b.Email != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 7, 10)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 7, 9)
 		x.xxx_hidden_Email = b.Email
 	}
 	if b.AnEnum != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 8, 10)
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 8, 9)
 		x.xxx_hidden_AnEnum = *b.AnEnum
-	}
-	if b.ShardId != nil {
-		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 9, 10)
-		x.xxx_hidden_ShardId = *b.ShardId
 	}
 	return m0
 }
@@ -1654,7 +1624,7 @@ const file_v1_example_proto_rawDesc = "" +
 	"\x02id\n" +
 	"\acountry\n" +
 	"\x03foo\x1a\n" +
-	"dummyvalue\"\xd1\x03\n" +
+	"dummyvalue\"\xb6\x03\n" +
 	"\x04User\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x129\n" +
@@ -1667,9 +1637,7 @@ const file_v1_example_proto_rawDesc = "" +
 	"\x06idp_id\x18\x06 \x01(\tR\x05idpId\x12!\n" +
 	"\fdisplay_name\x18\a \x01(\tR\vdisplayName\x12\x14\n" +
 	"\x05email\x18\b \x01(\tR\x05email\x120\n" +
-	"\aan_enum\x18\t \x01(\x0e2\x17.examplepb.v1.BasicEnumR\x06anEnum\x12\x19\n" +
-	"\bshard_id\x18\n" +
-	" \x01(\rR\ashardId:N\x82\xf7\x02J\x12\x15\n" +
+	"\aan_enum\x18\t \x01(\x0e2\x17.examplepb.v1.BasicEnumR\x06anEnum:N\x82\xf7\x02J\x12\x15\n" +
 	"\ttenant_id\x12\x02id\"\x04\b\x01\x10 \x12\x13\n" +
 	"\ttenant_id\x12\x06idp_id\x12\x1c\n" +
 	"\ttenant_id\x12\x06idp_id\x12\aan_enum\"\xee\x05\n" +

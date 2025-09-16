@@ -84,7 +84,6 @@ message User {
   string display_name = 7;
   string email = 8;
   BasicEnum an_enum = 9;
-  uint32 shard_id = 10;
 }
 
 enum BasicEnum {
