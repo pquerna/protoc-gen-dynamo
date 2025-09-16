@@ -86,6 +86,11 @@ func isShardingEnabled(key *dynamopb.Key) bool {
 	return key != nil && key.Shard != nil && key.Shard.Enabled && key.Shard.ShardCount > 0
 }
 
+// isPowerOfTwo checks if a number is a power of 2
+func isPowerOfTwo(n uint32) bool {
+	return n > 0 && (n&(n-1)) == 0
+}
+
 // validateShardConfig validates that sharding configuration is correct
 func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
 	// If sharding config exists and enabled is true, validate shard_count
@@ -93,12 +98,17 @@ func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
 		return nil
 	}
 
-	// Validate shard_count is reasonable (> shardMinLimit and <= shardMinLimit)
+	// Validate shard_count is reasonable (>= shardMinLimit and <= shardMaxLimit)
 	if key.Shard.ShardCount < shardMinLimit {
 		return fmt.Errorf("shard_count must be >= %d for message %s (got %d)", shardMinLimit, msg.FullyQualifiedName(), key.Shard.ShardCount)
 	}
 	if key.Shard.ShardCount > shardMaxLimit {
 		return fmt.Errorf("shard_count must be <= %d for message %s (got %d)", shardMaxLimit, msg.FullyQualifiedName(), key.Shard.ShardCount)
+	}
+
+	// Validate shard_count is a power of 2 to avoid modulo bias
+	if !isPowerOfTwo(key.Shard.ShardCount) {
+		return fmt.Errorf("shard_count must be a power of 2 for message %s (got %d)", msg.FullyQualifiedName(), key.Shard.ShardCount)
 	}
 
 	// For sharded keys, validate that sort key is properly configured
@@ -628,8 +638,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		}
 	}
 
-	// First, compute PK:SK for sharding
-	stmts = append(stmts, jen.Op("var").Id("pkskBuilder").Qual(stringsPkg, "Builder"))
+	// First, compute PK:SK for sharding using the same string builder
 
 	// Build PK part
 	first := true
@@ -639,19 +648,19 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		srcName := field.Name().UpperCamelCase().String()
 		srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
 		if !first {
-			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				jen.Lit(sep),
 			))
 		}
 		first = false
 		switch {
 		case pt == pgs.StringT:
-			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				srcFunc,
 			))
 		case pt.IsNumeric() || pt == pgs.EnumT:
 			fmtCall := numberFormatStatement(pt, srcFunc)
-			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				fmtCall,
 			))
 		default:
@@ -660,7 +669,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 	}
 
 	// Add separator between PK and SK
-	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 		jen.Lit(sep),
 	))
 
@@ -672,19 +681,19 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		srcName := field.Name().UpperCamelCase().String()
 		srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
 		if !first {
-			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				jen.Lit(sep),
 			))
 		}
 		first = false
 		switch {
 		case pt == pgs.StringT:
-			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				srcFunc,
 			))
 		case pt.IsNumeric() || pt == pgs.EnumT:
 			fmtCall := numberFormatStatement(pt, srcFunc)
-			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("pkskBuilder").Dot("WriteString").Call(
+			stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
 				fmtCall,
 			))
 		default:
@@ -692,15 +701,20 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		}
 	}
 
-	// Calculate shard
-	stmts = append(stmts, jen.Id("pkskStr").Op(":=").Id("pkskBuilder").Dot("String").Call())
-	stmts = append(stmts, jen.Id("hashValue").Op(":=").Uint32().Call(jen.Qual(xxhashPkg, "Sum64String").Call(jen.Id("pkskStr"))))
+	// Calculate shard using 64-bit hash and bitwise masking to avoid modulo bias
+	stmts = append(stmts, jen.Id("pkskStr").Op(":=").Id(stringBuffer).Dot("String").Call())
+	stmts = append(stmts, jen.Id("hashValue").Op(":=").Qual(xxhashPkg, "Sum64String").Call(jen.Id("pkskStr")))
 	if shardConfig.ShardCount <= shardMinLimit || shardConfig.ShardCount > shardMaxLimit {
 		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be between %d and %d", shardMinLimit, shardMaxLimit))
 	}
-	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("%").Lit(int(shardConfig.ShardCount)))
+	if !isPowerOfTwo(shardConfig.ShardCount) {
+		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be a power of 2 (got %d)", shardConfig.ShardCount))
+	}
+	// Use bitwise AND masking instead of modulo for better performance
+	stmts = append(stmts, jen.Id("shardId").Op(":=").Uint32().Call(jen.Id("hashValue").Op("&").Lit(int(shardConfig.ShardCount-1))))
 
-	// Now build the actual partition key with original PK fields first
+	// Reset the buffer to build the actual partition key with original PK fields first
+	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
 	first = true
 	for _, fn := range pkFields {
 		field := fieldByName(msg, fn)
