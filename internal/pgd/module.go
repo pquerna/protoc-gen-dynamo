@@ -711,7 +711,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be a power of 2 (got %d)", shardConfig.ShardCount))
 	}
 	// Use bitwise AND masking instead of modulo for better performance
-	stmts = append(stmts, jen.Id("shardId").Op(":=").Uint32().Call(jen.Id("hashValue").Op("&").Lit(int(shardConfig.ShardCount-1))))
+	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("&").Lit(int(shardConfig.ShardCount-1)))
 
 	// Reset the buffer to build the actual partition key with original PK fields first
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())

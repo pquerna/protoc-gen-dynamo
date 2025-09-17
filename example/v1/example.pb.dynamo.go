@@ -113,7 +113,7 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	_, _ = sb.WriteString(p.GetId())
 	pkskStr := sb.String()
 	hashValue := xxhash.Sum64String(pkskStr)
-	shardId := uint32(hashValue & 31)
+	shardId := hashValue & 31
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
 	_, _ = sb.WriteString(p.GetTenantId())
@@ -542,7 +542,7 @@ func (p *User) PartitionKey() string {
 	_, _ = sb.WriteString(p.GetId())
 	pkskStr := sb.String()
 	hashValue := xxhash.Sum64String(pkskStr)
-	shardId := uint32(hashValue & 31)
+	shardId := hashValue & 31
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
 	_, _ = sb.WriteString(p.GetTenantId())
@@ -748,7 +748,7 @@ func (p *UserV2) Gsi1PkKey() string {
 	_, _ = sb.WriteString(p.GetEmail())
 	pkskStr := sb.String()
 	hashValue := xxhash.Sum64String(pkskStr)
-	shardId := uint32(hashValue & 31)
+	shardId := hashValue & 31
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
@@ -788,7 +788,7 @@ func (p *UserV2) Gsi2PkKey() string {
 	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	pkskStr := sb.String()
 	hashValue := xxhash.Sum64String(pkskStr)
-	shardId := uint32(hashValue & 63)
+	shardId := hashValue & 63
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
