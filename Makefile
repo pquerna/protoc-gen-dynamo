@@ -14,6 +14,10 @@ generate:
 example: build
 	buf --debug generate --template buf.example.gen.yaml --path examplepb/v1
 
+.PHONE: badshardtest
+badshardtest:
+	buf --debug generate --template buf.badshardtest.gen.yaml --path badshardconfigpb/v1
+
 .PHONY: fmt
 fmt:
 	buf format -w 
