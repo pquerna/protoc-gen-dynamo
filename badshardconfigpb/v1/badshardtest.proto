@@ -1,0 +1,69 @@
+edition = "2023";
+
+package badshardconfig.v1;
+
+import "dynamo/v1/dynamo.proto";
+
+option go_package = "github.com/pquerna/protoc-gen-dynamo/badshardconfig/v1";
+
+// This file contains various bad sharding configurations to test validation.
+// Since protoc stops at the first validation error, to test each case:
+// 1. Comment out all messages except the one you want to test
+// 2. Run: protoc --plugin=protoc-gen-dynamo=./build/protoc-gen-dynamo --dynamo_out=./test_validation --proto_path=proto --proto_path=. badshardconfigpb/v1/test_bad_shard.proto
+// 3. Expected behavior: BadUser1 and BadUser2 should fail validation, GoodUser should succeed
+
+// Test case 1: this is properly configured
+message GoodUser {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+    shard: {
+      enabled: true
+      shard_count: 32
+    }
+  };
+  string tenant_id = 1;
+  string id = 2;
+}
+
+// Test case 2: shard_count too high (> 128)
+message BadUser1 {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+    shard: {
+      enabled: true
+      shard_count: 2000  // should cause validation error (> 128)
+    }
+  };
+  string tenant_id = 1;
+  string id = 2;
+}
+
+// Test case 3: shard_count is 1 (should cause validation error)
+message BadUser2 {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+    shard: {
+      enabled: true
+      shard_count: 1  // should cause validation error - count must be > 1
+    }
+  };
+  string tenant_id = 1;
+  string id = 2;
+}
+
+// Test case 4: shard_count not a power of 2
+message BadUser3 {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+    shard: {
+      enabled: true
+      shard_count: 5  // should cause validation error not a power of 2
+    }
+  };
+  string tenant_id = 1;
+  string id = 2;
+}

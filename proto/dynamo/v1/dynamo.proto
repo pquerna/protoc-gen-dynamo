@@ -26,6 +26,13 @@ message Key {
   // If set, the value of sort key is set to a constant string.  In this case
   // sk_fields is ignored.
   string sk_const = 3;
+  ShardOptions shard = 4;
+}
+
+message ShardOptions {
+  // Sharding is opt-in
+  bool enabled = 1;
+  uint32 shard_count = 2;
 }
 
 extend google.protobuf.FieldOptions {

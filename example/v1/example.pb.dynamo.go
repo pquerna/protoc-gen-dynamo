@@ -6,6 +6,7 @@ package v1
 import (
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/cespare/xxhash/v2"
 	"github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
 	"strconv"
 	"strings"
@@ -104,7 +105,20 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	var err error
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
+	if len(p.GetId()) == 0 {
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "id"))
+	}
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetId())
+	pkskStr := sb.String()
+	hashValue := xxhash.Sum64String(pkskStr)
+	shardId := hashValue & 31
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
 	v1 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString(p.GetId())
@@ -255,14 +269,16 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	v3 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetEmail())
 	v4 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
 	v5 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
-	_, _ = sb.WriteString(p.GetIdpId())
-	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	v6 := &types.AttributeValueMemberS{Value: sb.String()}
 	v7, err := p.Version()
@@ -518,7 +534,20 @@ func (p *User) PartitionKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user:")
+	if len(p.GetId()) == 0 {
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "id"))
+	}
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetId())
+	pkskStr := sb.String()
+	hashValue := xxhash.Sum64String(pkskStr)
+	shardId := hashValue & 31
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
 	return sb.String()
 }
 
@@ -586,6 +615,23 @@ func UserGsi2SkKey(idpId *string, anEnum *BasicEnum) string {
 		AnEnum: anEnum,
 		IdpId:  idpId,
 	}).Build().Gsi2SkKey()
+}
+
+func (p *User) PartitionKeyWithShard(shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func (p *User) PartitionKeysWithShard() []string {
+	keys := make([]string, 0, 32)
+	for i := uint32(0); i < 32; i++ {
+		keys = append(keys, p.PartitionKeyWithShard(i))
+	}
+	return keys
 }
 
 func (p *StoreV2) Version() (int64, error) {
@@ -689,7 +735,25 @@ func (p *UserV2) Gsi1PkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	if len(p.GetIdpId()) == 0 {
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "idp_id"))
+	}
+	if len(p.GetEmail()) == 0 {
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "email"))
+	}
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetEmail())
+	pkskStr := sb.String()
+	hashValue := xxhash.Sum64String(pkskStr)
+	shardId := hashValue & 31
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
 	return sb.String()
 }
 
@@ -701,11 +765,16 @@ func (p *UserV2) Gsi1SkKey() string {
 	var sb strings.Builder
 	sb.Reset()
 	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetEmail())
 	return sb.String()
 }
 
-func UserV2Gsi1SkKey(idpId *string) string {
-	return (&UserV2_builder{IdpId: idpId}).Build().Gsi1SkKey()
+func UserV2Gsi1SkKey(idpId *string, email *string) string {
+	return (&UserV2_builder{
+		Email: email,
+		IdpId: idpId,
+	}).Build().Gsi1SkKey()
 }
 
 func (p *UserV2) Gsi2PkKey() string {
@@ -713,25 +782,139 @@ func (p *UserV2) Gsi2PkKey() string {
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
+	pkskStr := sb.String()
+	hashValue := xxhash.Sum64String(pkskStr)
+	shardId := hashValue & 63
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardId), 10))
 	return sb.String()
 }
 
-func UserV2Gsi2PkKey(tenantId *string) string {
-	return (&UserV2_builder{TenantId: tenantId}).Build().Gsi2PkKey()
+func UserV2Gsi2PkKey(tenantId *string, idpId *string) string {
+	return (&UserV2_builder{
+		IdpId:    idpId,
+		TenantId: tenantId,
+	}).Build().Gsi2PkKey()
 }
 
 func (p *UserV2) Gsi2SkKey() string {
 	var sb strings.Builder
 	sb.Reset()
-	_, _ = sb.WriteString(p.GetIdpId())
-	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
 	return sb.String()
 }
 
-func UserV2Gsi2SkKey(idpId *string, anEnum *BasicEnum) string {
-	return (&UserV2_builder{
-		AnEnum: anEnum,
-		IdpId:  idpId,
-	}).Build().Gsi2SkKey()
+func UserV2Gsi2SkKey(anEnum *BasicEnum) string {
+	return (&UserV2_builder{AnEnum: anEnum}).Build().Gsi2SkKey()
+}
+
+func (p *UserV2) Gsi1PartitionKeyWithShard(shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func (p *UserV2) Gsi1PartitionKeysWithShard() []string {
+	keys := make([]string, 0, 32)
+	for i := uint32(0); i < 32; i++ {
+		keys = append(keys, p.Gsi1PartitionKeyWithShard(i))
+	}
+	return keys
+}
+
+func (p *UserV2) Gsi2PartitionKeyWithShard(shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func (p *UserV2) Gsi2PartitionKeysWithShard() []string {
+	keys := make([]string, 0, 64)
+	for i := uint32(0); i < 64; i++ {
+		keys = append(keys, p.Gsi2PartitionKeyWithShard(i))
+	}
+	return keys
+}
+
+func (p *User) GetShardFromPartitionKey() (uint32, error) {
+	pk := p.PartitionKey()
+	parts := strings.Split(pk, ":")
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("invalid key: empty")
+	}
+	lastPart := parts[len(parts)-1]
+	shard, err := strconv.ParseUint(lastPart, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse shard from key: %w", err)
+	}
+	return uint32(shard), nil
+}
+
+func (p *User) GetShardCount() uint32 {
+	return 32
+}
+
+func UserShardCount() uint32 {
+	return 32
+}
+
+func (p *UserV2) GetGsi1ShardFromPartitionKey() (uint32, error) {
+	pk := p.Gsi1PkKey()
+	parts := strings.Split(pk, ":")
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("invalid key: empty")
+	}
+	lastPart := parts[len(parts)-1]
+	shard, err := strconv.ParseUint(lastPart, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse shard from key: %w", err)
+	}
+	return uint32(shard), nil
+}
+
+func (p *UserV2) GetGsi1ShardCount() uint32 {
+	return 32
+}
+
+func UserV2Gsi1ShardCount() uint32 {
+	return 32
+}
+
+func (p *UserV2) GetGsi2ShardFromPartitionKey() (uint32, error) {
+	pk := p.Gsi2PkKey()
+	parts := strings.Split(pk, ":")
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("invalid key: empty")
+	}
+	lastPart := parts[len(parts)-1]
+	shard, err := strconv.ParseUint(lastPart, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse shard from key: %w", err)
+	}
+	return uint32(shard), nil
+}
+
+func (p *UserV2) GetGsi2ShardCount() uint32 {
+	return 64
+}
+
+func UserV2Gsi2ShardCount() uint32 {
+	return 64
 }

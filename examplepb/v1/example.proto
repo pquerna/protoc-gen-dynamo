@@ -59,6 +59,10 @@ message User {
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
     sk_fields: ["id"]
+    shard: {
+      enabled: true
+      shard_count: 32
+    }
   };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
@@ -140,14 +144,21 @@ message UserV2 {
   };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
-    sk_fields: ["idp_id"]
+    sk_fields: ["idp_id", "email"]
+    shard: {
+      enabled: true
+      shard_count: 32
+    }
   };
   option (dynamo.v1.msg).key = {
-    pk_fields: ["tenant_id"]
+    pk_fields: ["tenant_id", "idp_id"]
     sk_fields: [
-      "idp_id",
       "an_enum"
     ]
+    shard: {
+      enabled: true
+      shard_count: 64
+    }
   };
   string tenant_id = 1;
   string id = 2;
