@@ -382,18 +382,184 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				stmts...,
 			).Line()
 
-			var params []jen.Code
-			d := jen.Dict{}
-			for _, fn := range key.fields {
-				field := fieldByName(msg, fn)
-				typ := m.ctx.Type(field)
-				params = append(params, jen.Id(field.Name().LowerCamelCase().String()).Id(typ.String()))
-				d[jen.Id(field.Name().UpperCamelCase().String())] = jen.Id(field.Name().LowerCamelCase().String())
+			// Check if this is a sharded partition key
+			var shardedKeyIndex int = -1
+			if key.prefix {
+				if key.name == "PartitionKey" {
+					shardedKeyIndex = 0
+				} else {
+					// Extract GSI index from name like "Gsi1PkKey"
+					fmt.Sscanf(key.name, "Gsi%dPkKey", &shardedKeyIndex)
+				}
 			}
 
-			f.Func().Id(structName.String() + key.name).Params(params...).List(jen.String()).Block(
-				jen.Return(jen.Call(jen.Op("&").Id(structName.String() + "_builder").Values(d)).Dot("Build").Call().Dot(key.name).Call()),
-			).Line()
+			isShardedPK := shardedKeyIndex >= 0 && shardedKeyIndex < len(mext.Key) && isShardingEnabled(mext.Key[shardedKeyIndex])
+
+			if isShardedPK {
+				// For sharded partition keys, generate two variants instead of the normal anonymous function:
+				// 1. <Struct><KeyName>WithShard(pkFields..., shard uint32) string - explicit shard
+				// 2. <Struct><KeyName>WithoutShard(pkFields...) string - no shard suffix
+
+				ck := mext.Key[shardedKeyIndex]
+
+				// Generate <Struct><KeyName>WithShard - uses non-pointer value types
+				var paramsWithShard []jen.Code
+				var withShardStmts []jen.Code
+				withShardStmts = append(withShardStmts,
+					jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+				)
+
+				// Build prefix
+				prefix := fmt.Sprintf("%s_%s", msg.Package().ProtoName().LowerSnakeCase().String(), msg.Name().LowerSnakeCase().String())
+				withShardStmts = append(withShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+					jen.Lit(prefix+":"),
+				))
+
+				// Add PK fields
+				first := true
+				for _, fn := range ck.PkFields {
+					field := fieldByName(msg, fn)
+					pt := field.Type().ProtoType()
+					paramName := field.Name().LowerCamelCase().String()
+
+					// Use value type, not pointer
+					switch pt {
+					case pgs.StringT:
+						paramsWithShard = append(paramsWithShard, jen.Id(paramName).String())
+					case pgs.Int32T, pgs.SInt32, pgs.SFixed32:
+						paramsWithShard = append(paramsWithShard, jen.Id(paramName).Int32())
+					case pgs.Int64T, pgs.SInt64, pgs.SFixed64:
+						paramsWithShard = append(paramsWithShard, jen.Id(paramName).Int64())
+					case pgs.UInt32T, pgs.Fixed32T:
+						paramsWithShard = append(paramsWithShard, jen.Id(paramName).Uint32())
+					case pgs.UInt64T, pgs.Fixed64T:
+						paramsWithShard = append(paramsWithShard, jen.Id(paramName).Uint64())
+					case pgs.EnumT:
+						enumType := m.ctx.Type(field)
+						paramsWithShard = append(paramsWithShard, jen.Id(paramName).Id(enumType.String()))
+					default:
+						panic(fmt.Sprintf("Sharded key WithShard: unsupported type: %s", pt.String()))
+					}
+
+					if !first {
+						withShardStmts = append(withShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+							jen.Lit(":"),
+						))
+					}
+					first = false
+					switch {
+					case pt == pgs.StringT:
+						withShardStmts = append(withShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+							jen.Id(paramName),
+						))
+					case pt.IsNumeric() || pt == pgs.EnumT:
+						fmtCall := numberFormatStatement(pt, jen.Id(paramName))
+						withShardStmts = append(withShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+							fmtCall,
+						))
+					default:
+						panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
+					}
+				}
+
+				// Add shard parameter and append shard to string
+				paramsWithShard = append(paramsWithShard, jen.Id("shard").Uint32())
+				withShardStmts = append(withShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+					jen.Lit(":"),
+				))
+				withShardStmts = append(withShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+					jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id("shard")), jen.Lit(10)),
+				))
+
+				withShardStmts = append(withShardStmts,
+					jen.Return(jen.Id("sb").Dot("String").Call()),
+				)
+
+				f.Func().Id(structName.String() + key.name + "WithShard").Params(paramsWithShard...).List(jen.String()).Block(
+					withShardStmts...,
+				).Line()
+
+				// Generate <Struct><KeyName>WithoutShard - returns PK without the shard suffix
+				var paramsWithoutShard []jen.Code
+				var withoutShardStmts []jen.Code
+				withoutShardStmts = append(withoutShardStmts,
+					jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
+				)
+
+				// Build prefix
+				withoutShardStmts = append(withoutShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+					jen.Lit(prefix+":"),
+				))
+
+				// Add PK fields
+				first = true
+				for _, fn := range ck.PkFields {
+					field := fieldByName(msg, fn)
+					pt := field.Type().ProtoType()
+					paramName := field.Name().LowerCamelCase().String()
+
+					// Use value type, not pointer
+					switch pt {
+					case pgs.StringT:
+						paramsWithoutShard = append(paramsWithoutShard, jen.Id(paramName).String())
+					case pgs.Int32T, pgs.SInt32, pgs.SFixed32:
+						paramsWithoutShard = append(paramsWithoutShard, jen.Id(paramName).Int32())
+					case pgs.Int64T, pgs.SInt64, pgs.SFixed64:
+						paramsWithoutShard = append(paramsWithoutShard, jen.Id(paramName).Int64())
+					case pgs.UInt32T, pgs.Fixed32T:
+						paramsWithoutShard = append(paramsWithoutShard, jen.Id(paramName).Uint32())
+					case pgs.UInt64T, pgs.Fixed64T:
+						paramsWithoutShard = append(paramsWithoutShard, jen.Id(paramName).Uint64())
+					case pgs.EnumT:
+						enumType := m.ctx.Type(field)
+						paramsWithoutShard = append(paramsWithoutShard, jen.Id(paramName).Id(enumType.String()))
+					default:
+						panic(fmt.Sprintf("Sharded key WithoutShard: unsupported type: %s", pt.String()))
+					}
+
+					if !first {
+						withoutShardStmts = append(withoutShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+							jen.Lit(":"),
+						))
+					}
+					first = false
+					switch {
+					case pt == pgs.StringT:
+						withoutShardStmts = append(withoutShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+							jen.Id(paramName),
+						))
+					case pt.IsNumeric() || pt == pgs.EnumT:
+						fmtCall := numberFormatStatement(pt, jen.Id(paramName))
+						withoutShardStmts = append(withoutShardStmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id("sb").Dot("WriteString").Call(
+							fmtCall,
+						))
+					default:
+						panic(fmt.Sprintf("Compound key: unsupported type: %s", pt.String()))
+					}
+				}
+
+				withoutShardStmts = append(withoutShardStmts,
+					jen.Return(jen.Id("sb").Dot("String").Call()),
+				)
+
+				f.Func().Id(structName.String() + key.name + "WithoutShard").Params(paramsWithoutShard...).List(jen.String()).Block(
+					withoutShardStmts...,
+				).Line()
+			} else {
+				// For non-sharded keys, generate the normal anonymous function
+				var params []jen.Code
+				d := jen.Dict{}
+				for _, fn := range key.fields {
+					field := fieldByName(msg, fn)
+					typ := m.ctx.Type(field)
+					params = append(params, jen.Id(field.Name().LowerCamelCase().String()).Id(typ.String()))
+					d[jen.Id(field.Name().UpperCamelCase().String())] = jen.Id(field.Name().LowerCamelCase().String())
+				}
+
+				f.Func().Id(structName.String() + key.name).Params(params...).List(jen.String()).Block(
+					jen.Return(jen.Call(jen.Op("&").Id(structName.String()+"_builder").Values(d)).Dot("Build").Call().Dot(key.name).Call()),
+				).Line()
+			}
 		}
 
 		// Generate pagination functions for each sharded key

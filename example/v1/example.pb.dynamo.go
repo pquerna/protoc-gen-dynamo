@@ -551,8 +551,20 @@ func (p *User) PartitionKey() string {
 	return sb.String()
 }
 
-func UserPartitionKey(tenantId *string) string {
-	return (&User_builder{TenantId: tenantId}).Build().PartitionKey()
+func UserPartitionKeyWithShard(tenantId string, shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user:")
+	_, _ = sb.WriteString(tenantId)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func UserPartitionKeyWithoutShard(tenantId string) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user:")
+	_, _ = sb.WriteString(tenantId)
+	return sb.String()
 }
 
 func (p *User) SortKey() string {
@@ -757,8 +769,20 @@ func (p *UserV2) Gsi1PkKey() string {
 	return sb.String()
 }
 
-func UserV2Gsi1PkKey(tenantId *string) string {
-	return (&UserV2_builder{TenantId: tenantId}).Build().Gsi1PkKey()
+func UserV2Gsi1PkKeyWithShard(tenantId string, shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(tenantId)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func UserV2Gsi1PkKeyWithoutShard(tenantId string) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(tenantId)
+	return sb.String()
 }
 
 func (p *UserV2) Gsi1SkKey() string {
@@ -799,11 +823,24 @@ func (p *UserV2) Gsi2PkKey() string {
 	return sb.String()
 }
 
-func UserV2Gsi2PkKey(tenantId *string, idpId *string) string {
-	return (&UserV2_builder{
-		IdpId:    idpId,
-		TenantId: tenantId,
-	}).Build().Gsi2PkKey()
+func UserV2Gsi2PkKeyWithShard(tenantId string, idpId string, shard uint32) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(tenantId)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(idpId)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
+	return sb.String()
+}
+
+func UserV2Gsi2PkKeyWithoutShard(tenantId string, idpId string) string {
+	var sb strings.Builder
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(tenantId)
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(idpId)
+	return sb.String()
 }
 
 func (p *UserV2) Gsi2SkKey() string {
