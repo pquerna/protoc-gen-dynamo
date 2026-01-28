@@ -347,6 +347,24 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				stmts = append(stmts,
 					jen.Return(jen.Lit(key.constant)),
 				)
+			} else if !key.prefix && len(key.fields) == 1 {
+				// Optimization: for sort keys with a single field, avoid strings.Builder overhead
+				field := fieldByName(msg, key.fields[0])
+				pt := field.Type().ProtoType()
+				srcName := field.Name().UpperCamelCase().String()
+				srcFunc := jen.Id("p").Dot("Get" + srcName).Call()
+
+				switch {
+				case pt == pgs.StringT:
+					// Single string field: return directly without strings.Builder
+					stmts = append(stmts, jen.Return(srcFunc))
+				case pt.IsNumeric() || pt == pgs.EnumT:
+					// Single numeric/enum field: format and return directly
+					fmtCall := numberFormatStatement(pt, srcFunc)
+					stmts = append(stmts, jen.Return(fmtCall))
+				default:
+					panic(fmt.Sprintf("Single field key: unsupported type: %s", pt.String()))
+				}
 			} else {
 				stmts = append(stmts,
 					jen.Op("var").Id("sb").Qual(stringsPkg, "Builder"),
