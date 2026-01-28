@@ -568,10 +568,7 @@ func UserPartitionKeyWithoutShard(tenantId string) string {
 }
 
 func (p *User) SortKey() string {
-	var sb strings.Builder
-	sb.Reset()
-	_, _ = sb.WriteString(p.GetId())
-	return sb.String()
+	return p.GetId()
 }
 
 func UserSortKey(id *string) string {
@@ -591,10 +588,7 @@ func UserGsi1PkKey(tenantId *string) string {
 }
 
 func (p *User) Gsi1SkKey() string {
-	var sb strings.Builder
-	sb.Reset()
-	_, _ = sb.WriteString(p.GetIdpId())
-	return sb.String()
+	return p.GetIdpId()
 }
 
 func UserGsi1SkKey(idpId *string) string {
@@ -733,10 +727,7 @@ func UserV2PartitionKey(tenantId *string) string {
 }
 
 func (p *UserV2) SortKey() string {
-	var sb strings.Builder
-	sb.Reset()
-	_, _ = sb.WriteString(p.GetId())
-	return sb.String()
+	return p.GetId()
 }
 
 func UserV2SortKey(id *string) string {
@@ -844,10 +835,7 @@ func UserV2Gsi2PkKeyWithoutShard(tenantId string, idpId string) string {
 }
 
 func (p *UserV2) Gsi2SkKey() string {
-	var sb strings.Builder
-	sb.Reset()
-	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
-	return sb.String()
+	return strconv.FormatInt(int64(p.GetAnEnum()), 10)
 }
 
 func UserV2Gsi2SkKey(anEnum *BasicEnum) string {
