@@ -2,6 +2,7 @@ package protozstd
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -256,6 +257,62 @@ func BenchmarkCompressDecompress(b *testing.B) {
 	}
 }
 
+// BenchmarkDecompressWithPooledBuffer compares pooled vs non-pooled decompression
+func BenchmarkDecompressWithPooledBuffer(b *testing.B) {
+	mOpts := NewMarshalOptions()
+	mOpts.MinimumSizeToCompress = 100
+
+	// Create test data of various sizes
+	sizes := []int{1024, 4096, 16384, 65536}
+
+	for _, size := range sizes {
+		data := make([]byte, size)
+		for i := range data {
+			data[i] = byte(i % 256)
+		}
+
+		compressed, err := mOpts.compressValue(data)
+		if err != nil {
+			b.Fatalf("Compression failed: %v", err)
+		}
+
+		b.Run("non_pooled_"+formatSize(size), func(b *testing.B) {
+			uOpts := NewUnmarshalOptions()
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				_, err := uOpts.decompressValue(compressed)
+				if err != nil {
+					b.Fatalf("Decompression failed: %v", err)
+				}
+			}
+		})
+
+		b.Run("pooled_"+formatSize(size), func(b *testing.B) {
+			uOpts := NewUnmarshalOptions()
+			b.ResetTimer()
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				buf := uOpts.getBuffer()
+				result, err := uOpts.decompressValueInto(compressed, buf)
+				if err != nil {
+					b.Fatalf("Decompression failed: %v", err)
+				}
+				uOpts.putBuffer(result)
+			}
+		})
+	}
+}
+
+func formatSize(size int) string {
+	if size >= 1024 {
+		return fmt.Sprintf("%dKB", size/1024)
+	}
+	return fmt.Sprintf("%dB", size)
+}
+
 // Test custom encoder/decoder options
 func TestCustomEncoderDecoderOptions(t *testing.T) {
 	// Custom marshal options with different compression level
@@ -286,6 +343,116 @@ func TestCustomEncoderDecoderOptions(t *testing.T) {
 	if !uOpts.isCompressed(compressed) {
 		t.Errorf("Data compressed with custom options not detected as compressed")
 	}
+}
+
+// TestBufferPooling tests that buffer pooling works correctly
+func TestBufferPooling(t *testing.T) {
+	mOpts := NewMarshalOptions()
+	mOpts.MinimumSizeToCompress = 100
+
+	uOpts := NewUnmarshalOptions()
+
+	// Create test data large enough to compress
+	testData := make([]byte, 1024)
+	for i := range testData {
+		testData[i] = byte(i % 256)
+	}
+
+	// Compress the data
+	compressed, err := mOpts.compressValue(testData)
+	if err != nil {
+		t.Fatalf("Compression failed: %v", err)
+	}
+
+	// Test decompressValueInto with pooled buffer
+	buf := uOpts.getBuffer()
+	decompressed, err := uOpts.decompressValueInto(compressed, buf)
+	if err != nil {
+		t.Fatalf("decompressValueInto failed: %v", err)
+	}
+
+	// Verify data integrity
+	if !bytes.Equal(decompressed, testData) {
+		t.Errorf("Decompressed data doesn't match original")
+	}
+
+	// Return buffer to pool
+	uOpts.putBuffer(decompressed)
+
+	// Get another buffer and verify pool is working
+	buf2 := uOpts.getBuffer()
+	if buf2 == nil {
+		t.Errorf("getBuffer returned nil")
+	}
+	uOpts.putBuffer(buf2)
+}
+
+// TestBufferPoolConcurrency tests concurrent access to buffer pool
+func TestBufferPoolConcurrency(t *testing.T) {
+	mOpts := NewMarshalOptions()
+	mOpts.MinimumSizeToCompress = 100
+
+	uOpts := NewUnmarshalOptions()
+
+	// Create test data
+	testData := make([]byte, 2048)
+	for i := range testData {
+		testData[i] = byte(i % 256)
+	}
+
+	compressed, err := mOpts.compressValue(testData)
+	if err != nil {
+		t.Fatalf("Compression failed: %v", err)
+	}
+
+	// Run concurrent decompressions
+	var wg sync.WaitGroup
+	errChan := make(chan error, 100)
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			buf := uOpts.getBuffer()
+			decompressed, err := uOpts.decompressValueInto(compressed, buf)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			if !bytes.Equal(decompressed, testData) {
+				errChan <- err
+			}
+
+			uOpts.putBuffer(decompressed)
+		}()
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	for err := range errChan {
+		t.Errorf("Concurrent decompression error: %v", err)
+	}
+}
+
+// TestLargeBufferNotPooled tests that oversized buffers are not returned to pool
+func TestLargeBufferNotPooled(t *testing.T) {
+	uOpts := NewUnmarshalOptions()
+
+	// Create a very large buffer (larger than maxPooledBufferSize)
+	largeBuffer := make([]byte, 2<<20) // 2MB
+
+	// This should not panic and the buffer should be discarded
+	uOpts.putBuffer(largeBuffer)
+
+	// Get a new buffer - it should be the default size, not the large one
+	buf := uOpts.getBuffer()
+	if cap(buf) >= 2<<20 {
+		t.Errorf("Large buffer was incorrectly returned to pool")
+	}
+	uOpts.putBuffer(buf)
 }
 
 // TestErrorHandling tests error scenarios

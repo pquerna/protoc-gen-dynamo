@@ -22,6 +22,7 @@ type UnmarshalOptions struct {
 	proto.UnmarshalOptions
 	DecoderPool    *sync.Pool
 	DecoderOptions []zstd.DOption
+	BufferPool     *sync.Pool // Pool for decompression output buffers
 }
 
 var DefaultMarshalOptions = NewMarshalOptions()
@@ -44,6 +45,10 @@ func NewMarshalOptions() *MarshalOptions {
 	return mo
 }
 
+// defaultBufferSize is the initial capacity for pooled decompression buffers.
+// Most protobuf messages decompress to less than 64KB.
+const defaultBufferSize = 64 * 1024
+
 func NewUnmarshalOptions() *UnmarshalOptions {
 	uo := &UnmarshalOptions{
 		UnmarshalOptions: proto.UnmarshalOptions{},
@@ -54,6 +59,11 @@ func NewUnmarshalOptions() *UnmarshalOptions {
 	uo.DecoderPool = &sync.Pool{
 		New: func() any {
 			return uo.decoderConstruct()
+		},
+	}
+	uo.BufferPool = &sync.Pool{
+		New: func() any {
+			return make([]byte, 0, defaultBufferSize)
 		},
 	}
 	return uo
@@ -81,11 +91,17 @@ func (o *UnmarshalOptions) decoderConstruct() *zstd.Decoder {
 
 func (o *UnmarshalOptions) Unmarshal(data []byte, m proto.Message) error {
 	if o.isCompressed(data) {
-		var err error
-		data, err = o.decompressValue(data)
+		// Get a buffer from the pool for decompression
+		buf := o.getBuffer()
+		decompressed, err := o.decompressValueInto(data, buf)
 		if err != nil {
+			// Return buffer to pool on error
+			o.putBuffer(buf)
 			return err
 		}
+		// After proto unmarshal, the decompressed buffer is no longer needed
+		defer o.putBuffer(decompressed)
+		data = decompressed
 	}
 	return o.UnmarshalOptions.Unmarshal(data, m)
 }
