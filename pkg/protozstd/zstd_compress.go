@@ -26,6 +26,21 @@ func (o *UnmarshalOptions) putDecoder(dec *zstd.Decoder) {
 	o.DecoderPool.Put(dec)
 }
 
+// getBuffer gets a buffer from the pool for decompression output
+func (o *UnmarshalOptions) getBuffer() []byte {
+	return o.BufferPool.Get().([]byte)
+}
+
+// putBuffer returns a buffer to the pool, resetting it for reuse
+func (o *UnmarshalOptions) putBuffer(buf []byte) {
+	// Only return reasonably sized buffers to the pool to avoid memory bloat.
+	// Buffers larger than 1MB are discarded and will be GC'd.
+	const maxPooledBufferSize = 1 << 20 // 1MB
+	if cap(buf) <= maxPooledBufferSize {
+		o.BufferPool.Put(buf[:0])
+	}
+}
+
 // IsCompressed checks if the data is zstd compressed
 func (o *UnmarshalOptions) IsCompressed(data []byte) bool {
 	return o.isCompressed(data)
@@ -63,4 +78,20 @@ func (o *UnmarshalOptions) decompressValue(data []byte) ([]byte, error) {
 	defer o.putDecoder(dec)
 
 	return dec.DecodeAll(data, nil)
+}
+
+// decompressValueInto decompresses zstd data into the provided buffer.
+// The returned slice may have a different backing array if the buffer
+// capacity was insufficient. Callers should use the returned slice.
+func (o *UnmarshalOptions) decompressValueInto(data []byte, dst []byte) ([]byte, error) {
+	if !o.isCompressed(data) {
+		return data, nil
+	}
+
+	dec := o.getDecoder()
+	defer o.putDecoder(dec)
+
+	// DecodeAll will use dst's backing array if it has sufficient capacity,
+	// otherwise it allocates a new slice
+	return dec.DecodeAll(data, dst[:0])
 }
