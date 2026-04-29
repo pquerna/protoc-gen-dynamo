@@ -20,7 +20,7 @@ const (
 // source: %s
 `
 	shardMinLimit = 2
-	shardMaxLimit = 128
+	shardMaxLimit = 256
 )
 
 type Module struct {
@@ -575,7 +575,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				}
 
 				f.Func().Id(structName.String() + key.name).Params(params...).List(jen.String()).Block(
-					jen.Return(jen.Call(jen.Op("&").Id(structName.String()+"_builder").Values(d)).Dot("Build").Call().Dot(key.name).Call()),
+					jen.Return(jen.Call(jen.Op("&").Id(structName.String() + "_builder").Values(d)).Dot("Build").Call().Dot(key.name).Call()),
 				).Line()
 			}
 		}
