@@ -60,7 +60,6 @@ message User {
     pk_fields: ["tenant_id"]
     sk_fields: ["id"]
     shard: {
-      enabled: true
       shard_count: 32
     }
   };
@@ -146,7 +145,6 @@ message UserV2 {
     pk_fields: ["tenant_id"]
     sk_fields: ["idp_id", "email"]
     shard: {
-      enabled: true
       shard_count: 32
     }
   };
@@ -156,7 +154,6 @@ message UserV2 {
       "an_enum"
     ]
     shard: {
-      enabled: true
       shard_count: 64
     }
   };

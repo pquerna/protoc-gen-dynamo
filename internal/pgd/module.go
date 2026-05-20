@@ -81,9 +81,10 @@ const (
 	timestampType = "google.protobuf.Timestamp"
 )
 
-// isShardingEnabled checks if sharding is enabled for a key
+// isShardingEnabled checks if sharding is enabled for a key. Presence of a
+// shard config means sharded — there is no separate opt-in flag.
 func isShardingEnabled(key *dynamopb.Key) bool {
-	return key != nil && key.Shard != nil && key.Shard.Enabled && key.Shard.ShardCount > 0
+	return key != nil && key.Shard != nil && key.Shard.ShardCount > 0
 }
 
 // isPowerOfTwo checks if a number is a power of 2
@@ -93,8 +94,8 @@ func isPowerOfTwo(n uint32) bool {
 
 // validateShardConfig validates that sharding configuration is correct
 func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
-	// If sharding config exists and enabled is true, validate shard_count
-	if key == nil || key.Shard == nil || !key.Shard.Enabled {
+	// Presence of shard config means sharded; nothing to validate otherwise.
+	if key == nil || key.Shard == nil {
 		return nil
 	}
 
@@ -652,6 +653,26 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				paginationStmts...,
 			).Line()
 
+			// PartitionKeyWithoutShard() string - returns the PK without the shard
+			// suffix. Useful for stable identifiers like notification tokens.
+			var staticKeyName string
+			if i == 0 {
+				staticKeyName = "PartitionKey"
+			} else {
+				staticKeyName = fmt.Sprintf("Gsi%dPkKey", i)
+			}
+			var withoutShardArgs []jen.Code
+			for _, fn := range ck.PkFields {
+				field := fieldByName(msg, fn)
+				srcName := field.Name().UpperCamelCase().String()
+				withoutShardArgs = append(withoutShardArgs, jen.Id("p").Dot("Get"+srcName).Call())
+			}
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id(funcSuffix + "PartitionKeyWithoutShard").Params().List(jen.String()).Block(
+				jen.Return(jen.Id(structName.String() + staticKeyName + "WithoutShard").Call(withoutShardArgs...)),
+			).Line()
+
 			// PartitionKeysWithShard() []string - returns all possible sharded keys
 			var allKeysStmts []jen.Code
 			allKeysStmts = append(allKeysStmts,
@@ -688,6 +709,16 @@ func (m *Module) applyUtilityFuncs(f *jen.File, in pgs.File) error {
 		if ok && mext.Disabled {
 			m.Logf("dynamo.msg disabled for %s", structName)
 			continue
+		}
+
+		// Marker method on non-sharded message types. Sharded types are already
+		// uniquely identified by GetShardCount / PartitionKeyWithShard, so db-layer
+		// functions can constrain on those for the sharded side and on Unsharded()
+		// for the unsharded side.
+		if len(mext.Key) > 0 && !isShardingEnabled(mext.Key[0]) {
+			f.Func().Params(
+				jen.Id("_").Op("*").Id(structName.String()),
+			).Id("Unsharded").Params().Block().Line()
 		}
 
 		// Generate shard utility functions for each sharded key
