@@ -81,9 +81,10 @@ const (
 	timestampType = "google.protobuf.Timestamp"
 )
 
-// isShardingEnabled checks if sharding is enabled for a key
+// isShardingEnabled checks if sharding is enabled for a key. Presence of a
+// shard config means sharded — there is no separate opt-in flag.
 func isShardingEnabled(key *dynamopb.Key) bool {
-	return key != nil && key.Shard != nil && key.Shard.Enabled && key.Shard.ShardCount > 0
+	return key != nil && key.Shard != nil && key.Shard.ShardCount > 0
 }
 
 // isPowerOfTwo checks if a number is a power of 2
@@ -93,8 +94,8 @@ func isPowerOfTwo(n uint32) bool {
 
 // validateShardConfig validates that sharding configuration is correct
 func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
-	// If sharding config exists and enabled is true, validate shard_count
-	if key == nil || key.Shard == nil || !key.Shard.Enabled {
+	// Presence of shard config means sharded; nothing to validate otherwise.
+	if key == nil || key.Shard == nil {
 		return nil
 	}
 
@@ -688,6 +689,19 @@ func (m *Module) applyUtilityFuncs(f *jen.File, in pgs.File) error {
 		if ok && mext.Disabled {
 			m.Logf("dynamo.msg disabled for %s", structName)
 			continue
+		}
+
+		// Marker method indicating whether the primary partition key is sharded.
+		// Lets the db layer use the type system to reject sharded values passed to
+		// unsharded functions and vice-versa.
+		if len(mext.Key) > 0 {
+			markerName := "Unsharded"
+			if isShardingEnabled(mext.Key[0]) {
+				markerName = "Sharded"
+			}
+			f.Func().Params(
+				jen.Id("_").Op("*").Id(structName.String()),
+			).Id(markerName).Params().Block().Line()
 		}
 
 		// Generate shard utility functions for each sharded key

@@ -878,6 +878,10 @@ func (p *UserV2) Gsi2PartitionKeysWithShard() []string {
 	return keys
 }
 
+func (_ *Store) Unsharded() {}
+
+func (_ *User) Sharded() {}
+
 func (p *User) GetShardFromPartitionKey() (uint32, error) {
 	pk := p.PartitionKey()
 	parts := strings.Split(pk, ":")
@@ -899,6 +903,10 @@ func (p *User) GetShardCount() uint32 {
 func UserShardCount() uint32 {
 	return 32
 }
+
+func (_ *StoreV2) Unsharded() {}
+
+func (_ *UserV2) Unsharded() {}
 
 func (p *UserV2) GetGsi1ShardFromPartitionKey() (uint32, error) {
 	pk := p.Gsi1PkKey()

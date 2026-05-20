@@ -30,8 +30,8 @@ message Key {
 }
 
 message ShardOptions {
-  // Sharding is opt-in
-  bool enabled = 1;
+  reserved 1;
+  reserved "enabled";
   uint32 shard_count = 2;
 }
 
