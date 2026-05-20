@@ -632,6 +632,10 @@ func (p *User) PartitionKeyWithShard(shard uint32) string {
 	return sb.String()
 }
 
+func (p *User) PartitionKeyWithoutShard() string {
+	return UserPartitionKeyWithoutShard(p.GetTenantId())
+}
+
 func (p *User) PartitionKeysWithShard() []string {
 	keys := make([]string, 0, 32)
 	for i := uint32(0); i < 32; i++ {
@@ -851,6 +855,10 @@ func (p *UserV2) Gsi1PartitionKeyWithShard(shard uint32) string {
 	return sb.String()
 }
 
+func (p *UserV2) Gsi1PartitionKeyWithoutShard() string {
+	return UserV2Gsi1PkKeyWithoutShard(p.GetTenantId())
+}
+
 func (p *UserV2) Gsi1PartitionKeysWithShard() []string {
 	keys := make([]string, 0, 32)
 	for i := uint32(0); i < 32; i++ {
@@ -868,6 +876,10 @@ func (p *UserV2) Gsi2PartitionKeyWithShard(shard uint32) string {
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(strconv.FormatUint(uint64(shard), 10))
 	return sb.String()
+}
+
+func (p *UserV2) Gsi2PartitionKeyWithoutShard() string {
+	return UserV2Gsi2PkKeyWithoutShard(p.GetTenantId(), p.GetIdpId())
 }
 
 func (p *UserV2) Gsi2PartitionKeysWithShard() []string {

@@ -653,6 +653,26 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				paginationStmts...,
 			).Line()
 
+			// PartitionKeyWithoutShard() string - returns the PK without the shard
+			// suffix. Useful for stable identifiers like notification tokens.
+			var staticKeyName string
+			if i == 0 {
+				staticKeyName = "PartitionKey"
+			} else {
+				staticKeyName = fmt.Sprintf("Gsi%dPkKey", i)
+			}
+			var withoutShardArgs []jen.Code
+			for _, fn := range ck.PkFields {
+				field := fieldByName(msg, fn)
+				srcName := field.Name().UpperCamelCase().String()
+				withoutShardArgs = append(withoutShardArgs, jen.Id("p").Dot("Get"+srcName).Call())
+			}
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id(funcSuffix + "PartitionKeyWithoutShard").Params().List(jen.String()).Block(
+				jen.Return(jen.Id(structName.String() + staticKeyName + "WithoutShard").Call(withoutShardArgs...)),
+			).Line()
+
 			// PartitionKeysWithShard() []string - returns all possible sharded keys
 			var allKeysStmts []jen.Code
 			allKeysStmts = append(allKeysStmts,
