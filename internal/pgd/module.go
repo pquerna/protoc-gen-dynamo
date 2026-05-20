@@ -691,17 +691,14 @@ func (m *Module) applyUtilityFuncs(f *jen.File, in pgs.File) error {
 			continue
 		}
 
-		// Marker method indicating whether the primary partition key is sharded.
-		// Lets the db layer use the type system to reject sharded values passed to
-		// unsharded functions and vice-versa.
-		if len(mext.Key) > 0 {
-			markerName := "Unsharded"
-			if isShardingEnabled(mext.Key[0]) {
-				markerName = "Sharded"
-			}
+		// Marker method on non-sharded message types. Sharded types are already
+		// uniquely identified by GetShardCount / PartitionKeyWithShard, so db-layer
+		// functions can constrain on those for the sharded side and on Unsharded()
+		// for the unsharded side.
+		if len(mext.Key) > 0 && !isShardingEnabled(mext.Key[0]) {
 			f.Func().Params(
 				jen.Id("_").Op("*").Id(structName.String()),
-			).Id(markerName).Params().Block().Line()
+			).Id("Unsharded").Params().Block().Line()
 		}
 
 		// Generate shard utility functions for each sharded key
