@@ -2,6 +2,8 @@ package protozstd
 
 import (
 	"bytes"
+	"math/rand/v2"
+	"runtime"
 	"sync"
 	"testing"
 
@@ -317,4 +319,132 @@ func TestErrorHandling(t *testing.T) {
 			t.Errorf("Expected error with malformed zstd data but got nil")
 		}
 	})
+}
+
+// codecConstructionBytes reports the bytes allocated building one pooled codec.
+//
+// TotalAlloc is process-wide and cumulative, so unrelated runtime work landing inside the
+// window can only inflate a sample, never deflate it: the minimum of several samples
+// converges on the codec's own cost. A single sample drifts by a word or two often enough
+// to make an exact comparison flaky. The discarded first sample is separate -- zstd builds
+// package-level predefined tables lazily, so whichever caller measures first would
+// otherwise absorb that one-time cost.
+func codecConstructionBytes(t *testing.T, construct func()) uint64 {
+	t.Helper()
+	measure := func() uint64 {
+		var before, after runtime.MemStats
+		runtime.GC()
+		runtime.ReadMemStats(&before)
+		construct()
+		runtime.ReadMemStats(&after)
+		return after.TotalAlloc - before.TotalAlloc
+	}
+
+	measure()
+	lowest := measure()
+	for range 4 {
+		lowest = min(lowest, measure())
+	}
+	return lowest
+}
+
+// The pools size their internal state by concurrency, so a regression to the zstd default
+// (or to an explicit 0, which means GOMAXPROCS rather than "library default") is only
+// visible as allocation -- encoderOptions.concurrent is unexported and never reaches the
+// encoded bytes.
+func TestDefaultCodecsAreSingleWorker(t *testing.T) {
+	if runtime.GOMAXPROCS(0) < 2 {
+		t.Skip("codec concurrency is already 1 at GOMAXPROCS=1")
+	}
+
+	encoderWith := func(opts ...zstd.EOption) func() {
+		return func() {
+			enc, err := zstd.NewWriter(nil, opts...)
+			if err != nil {
+				t.Fatalf("NewWriter failed: %v", err)
+			}
+			// EncodeAll runs init.Do before its empty-input return, so a nil payload
+			// forces the concurrency-scaled states without doing compression work.
+			_ = enc.EncodeAll(nil, nil)
+			_ = enc.Close()
+		}
+	}
+	decoderWith := func(opts ...zstd.DOption) func() {
+		return func() {
+			dec, err := zstd.NewReader(nil, opts...)
+			if err != nil {
+				t.Fatalf("NewReader failed: %v", err)
+			}
+			dec.Close()
+		}
+	}
+
+	encDefaults := NewMarshalOptions().EncoderOptions
+	gotEnc := codecConstructionBytes(t, encoderWith(encDefaults...))
+	wantEnc := codecConstructionBytes(t, encoderWith(append(append([]zstd.EOption{}, encDefaults...), zstd.WithEncoderConcurrency(1))...))
+	if gotEnc != wantEnc {
+		t.Errorf("default encoder builds %d bytes of state, want %d (one worker)", gotEnc, wantEnc)
+	}
+
+	decDefaults := NewUnmarshalOptions().DecoderOptions
+	gotDec := codecConstructionBytes(t, decoderWith(decDefaults...))
+	wantDec := codecConstructionBytes(t, decoderWith(append(append([]zstd.DOption{}, decDefaults...), zstd.WithDecoderConcurrency(1))...))
+	if gotDec != wantDec {
+		t.Errorf("default decoder builds %d bytes of state, want %d (one worker)", gotDec, wantDec)
+	}
+}
+
+// Concurrency must stay invisible on the wire: callers store compressValue output, so a
+// change that altered the bytes would be a compatibility break rather than a tuning knob.
+func TestEncoderConcurrencyDoesNotChangeOutput(t *testing.T) {
+	payload := entropicPayload()
+
+	defaults := NewMarshalOptions().EncoderOptions
+	encodeWith := func(opts ...zstd.EOption) []byte {
+		enc, err := zstd.NewWriter(nil, append(append([]zstd.EOption{}, defaults...), opts...)...)
+		if err != nil {
+			t.Fatalf("NewWriter failed: %v", err)
+		}
+		defer func() { _ = enc.Close() }()
+		return enc.EncodeAll(payload, nil)
+	}
+
+	want := encodeWith(zstd.WithEncoderConcurrency(1))
+	for _, concurrency := range []int{2, 4, 8, runtime.GOMAXPROCS(0)} {
+		if got := encodeWith(zstd.WithEncoderConcurrency(concurrency)); !bytes.Equal(want, got) {
+			t.Errorf("concurrency %d changed the encoded bytes (%d vs %d bytes)", concurrency, len(got), len(want))
+		}
+	}
+
+	// What callers actually store goes through the pool, so pin that the pooled path agrees
+	// with a directly-built single-worker encoder. (It cannot catch a change to the default
+	// level: that moves this and want together. Guarding the level would need golden bytes,
+	// which would be brittle across zstd releases.)
+	stored, err := DefaultMarshalOptions.compressValue(payload)
+	if err != nil {
+		t.Fatalf("compressValue failed: %v", err)
+	}
+	if !bytes.Equal(want, stored) {
+		t.Errorf("DefaultMarshalOptions.compressValue produced %d bytes, want the %d-byte single-worker encoding", len(stored), len(want))
+	}
+}
+
+// entropicPayload is compressible but not trivially so. A periodic payload compresses to
+// identical bytes under every encoder, so it cannot witness an encoder change at all.
+func entropicPayload() []byte {
+	rng := rand.New(rand.NewPCG(1, 2))
+	chunks := make([][]byte, 8)
+	for i := range chunks {
+		chunk := make([]byte, 4096)
+		for j := range chunk {
+			chunk[j] = byte(rng.UintN(64))
+		}
+		chunks[i] = chunk
+	}
+
+	payload := make([]byte, 0, 512*1024)
+	for len(payload) < 512*1024 {
+		payload = append(payload, chunks[rng.IntN(len(chunks))]...)
+	}
+	return payload[:512*1024]
 }

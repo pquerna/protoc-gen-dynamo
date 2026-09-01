@@ -27,12 +27,29 @@ type UnmarshalOptions struct {
 var DefaultMarshalOptions = NewMarshalOptions()
 var DefaultUnmarshalOptions = NewUnmarshalOptions()
 
+// codecConcurrency pins both pools to single-worker codecs.
+//
+// This package only ever calls EncodeAll / DecodeAll, which take one codec off the zstd
+// object's internal channel and run synchronously in the caller's goroutine, so per-codec
+// concurrency buys nothing. Left unset it costs a full set of internal states per pooled
+// object -- GOMAXPROCS encoder states (~270 KB each at SpeedFastest) plus GOMAXPROCS block
+// decoders -- and sync.Pool discards those on every GC, so a busy process rebuilds them
+// continuously. Concurrency is not part of the zstd frame format, so output is
+// byte-identical either way.
+//
+// Spelled out rather than left to zstd, whose encoder defaults to GOMAXPROCS and whose
+// decoder defaults to min(4, GOMAXPROCS). Do not reach for 0 here: the decoder reads it as
+// GOMAXPROCS rather than "library default", and the encoder rejects it outright, which
+// encoderConstruct turns into a panic.
+const codecConcurrency = 1
+
 func NewMarshalOptions() *MarshalOptions {
 	mo := &MarshalOptions{
 		MarshalOptions:     proto.MarshalOptions{},
 		DisableCompression: false,
 		EncoderOptions: []zstd.EOption{
 			zstd.WithEncoderLevel(zstd.SpeedFastest),
+			zstd.WithEncoderConcurrency(codecConcurrency),
 		},
 	}
 
@@ -48,7 +65,7 @@ func NewUnmarshalOptions() *UnmarshalOptions {
 	uo := &UnmarshalOptions{
 		UnmarshalOptions: proto.UnmarshalOptions{},
 		DecoderOptions: []zstd.DOption{
-			zstd.WithDecoderConcurrency(0),
+			zstd.WithDecoderConcurrency(codecConcurrency),
 		},
 	}
 	uo.DecoderPool = &sync.Pool{
