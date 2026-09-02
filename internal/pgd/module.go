@@ -1506,7 +1506,22 @@ func (m *Module) applyUnmarshalMsgV2(f *jen.File, msg pgs.Message) error {
 		// Add decompression step for zstd compressed data
 		jen.Var().Id("data").Index().Byte(),
 		jen.Id("data").Op("=").Id("v").Dot("Value"),
-		jen.Return(jen.Qual(protozstdPkg, "Unmarshal").Call(jen.Id("data"), jen.Id("p"))),
+		// Name the message and the compressed length. protozstd.Unmarshal's error
+		// carries neither, so an unwrapped decode failure says only that a limit was
+		// exceeded or a frame was corrupt, with nothing to identify what failed. The
+		// compressed length is what turns a decoded-size rejection into a ratio, and
+		// so into a judgement about whether the blob or the decoder's cap is wrong.
+		jen.If(
+			jen.Id("err").Op(":=").Qual(protozstdPkg, "Unmarshal").Call(jen.Id("data"), jen.Id("p")),
+			jen.Id("err").Op("!=").Nil(),
+		).Block(
+			jen.Return(jen.Qual(fmtPkg, "Errorf").Call(
+				jen.Lit(fmt.Sprintf("dynamo: unmarshal %s (%s compressed bytes): %s", typeName, "%d", "%w")),
+				jen.Len(jen.Id("data")),
+				jen.Id("err"),
+			)),
+		),
+		jen.Return(jen.Nil()),
 	)
 
 	f.Func().Params(

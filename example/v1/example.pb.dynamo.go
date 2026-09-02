@@ -334,7 +334,10 @@ func (p *Store) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
 	}
 	var data []byte
 	data = v.Value
-	return protozstd.Unmarshal(data, p)
+	if err := protozstd.Unmarshal(data, p); err != nil {
+		return fmt.Errorf("dynamo: unmarshal examplepb.v1.Store (%d compressed bytes): %w", len(data), err)
+	}
+	return nil
 }
 
 func (p *Store) UnmarshalDynamo(av types.AttributeValue) error {
@@ -371,7 +374,10 @@ func (p *User) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
 	}
 	var data []byte
 	data = v.Value
-	return protozstd.Unmarshal(data, p)
+	if err := protozstd.Unmarshal(data, p); err != nil {
+		return fmt.Errorf("dynamo: unmarshal examplepb.v1.User (%d compressed bytes): %w", len(data), err)
+	}
+	return nil
 }
 
 func (p *User) UnmarshalDynamo(av types.AttributeValue) error {
@@ -408,7 +414,10 @@ func (p *StoreV2) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error
 	}
 	var data []byte
 	data = v.Value
-	return protozstd.Unmarshal(data, p)
+	if err := protozstd.Unmarshal(data, p); err != nil {
+		return fmt.Errorf("dynamo: unmarshal examplepb.v1.StoreV2 (%d compressed bytes): %w", len(data), err)
+	}
+	return nil
 }
 
 func (p *StoreV2) UnmarshalDynamo(av types.AttributeValue) error {
@@ -445,7 +454,10 @@ func (p *UserV2) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error 
 	}
 	var data []byte
 	data = v.Value
-	return protozstd.Unmarshal(data, p)
+	if err := protozstd.Unmarshal(data, p); err != nil {
+		return fmt.Errorf("dynamo: unmarshal examplepb.v1.UserV2 (%d compressed bytes): %w", len(data), err)
+	}
+	return nil
 }
 
 func (p *UserV2) UnmarshalDynamo(av types.AttributeValue) error {
