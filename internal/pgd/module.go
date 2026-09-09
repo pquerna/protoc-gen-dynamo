@@ -393,7 +393,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				if keyIndex >= 0 && keyIndex < len(mext.Key) && isShardingEnabled(mext.Key[keyIndex]) {
 					// Use sharded key generation for this partition key
 					ck := mext.Key[keyIndex]
-					stmts = generateShardedKeyStringer(msg, stmts, key.prefix, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer)
+					stmts = generateShardedKeyStringer(msg, stmts, key.prefix, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer, "")
 				} else {
 					stmts = generateKeyStringer(msg, stmts, key.prefix, key.fields, stringBuffer)
 				}
@@ -825,7 +825,15 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, fiel
 }
 
 // generateShardedKeyStringer generates a sharded partition key by calculating shard based on PK:SK
-func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, pkFields []string, skFields []string, shardConfig *dynamopb.ShardOptions, stringBuffer string) []jen.Code {
+// generateShardedKeyStringer emits the statements that compute a sharded
+// partition key into stringBuffer. varSuffix disambiguates the shard
+// temporaries when more than one sharded key is emitted into the same
+// function scope (the marshal path); pass "" when the statements get a
+// function of their own.
+func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, pkFields []string, skFields []string, shardConfig *dynamopb.ShardOptions, stringBuffer string, varSuffix string) []jen.Code {
+	pkskVar := "pkskStr" + varSuffix
+	hashVar := "hashValue" + varSuffix
+	shardVar := "shardId" + varSuffix
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
 	sep := ":"
 	prefix := ""
@@ -925,8 +933,8 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 	}
 
 	// Calculate shard using 64-bit hash and bitwise masking to avoid modulo bias
-	stmts = append(stmts, jen.Id("pkskStr").Op(":=").Id(stringBuffer).Dot("String").Call())
-	stmts = append(stmts, jen.Id("hashValue").Op(":=").Qual(xxhashPkg, "Sum64String").Call(jen.Id("pkskStr")))
+	stmts = append(stmts, jen.Id(pkskVar).Op(":=").Id(stringBuffer).Dot("String").Call())
+	stmts = append(stmts, jen.Id(hashVar).Op(":=").Qual(xxhashPkg, "Sum64String").Call(jen.Id(pkskVar)))
 	if shardConfig.ShardCount <= shardMinLimit || shardConfig.ShardCount > shardMaxLimit {
 		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be between %d and %d", shardMinLimit, shardMaxLimit))
 	}
@@ -934,7 +942,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be a power of 2 (got %d)", shardConfig.ShardCount))
 	}
 	// Use bitwise AND masking instead of modulo for better performance
-	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("&").Lit(int(shardConfig.ShardCount-1)))
+	stmts = append(stmts, jen.Id(shardVar).Op(":=").Id(hashVar).Op("&").Lit(int(shardConfig.ShardCount-1)))
 
 	// Reset the buffer to build the actual partition key with original PK fields first
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
@@ -978,7 +986,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		jen.Lit(sep),
 	))
 	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-		jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id("shardId")), jen.Lit(10)),
+		jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id(shardVar)), jen.Lit(10)),
 	))
 
 	return stmts
@@ -1152,9 +1160,16 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 		refId++
 		vname := fmt.Sprintf("v%d", refId)
 
-		// Use sharded key generation for primary partition key if sharding is enabled
-		if i == 0 && isShardingEnabled(ck) {
-			stmts = generateShardedKeyStringer(msg, stmts, true, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer)
+		// Use sharded key generation for any partition key with sharding enabled.
+		// This must mirror the <Struct>PartitionKey / <Struct>Gsi<N>PkKey stringers
+		// exactly, or a sharded GSI is written with an unsharded pk and no query
+		// against it can ever match.
+		if isShardingEnabled(ck) {
+			shardVarSuffix := ""
+			if i != 0 {
+				shardVarSuffix = fmt.Sprintf("Gsi%d", i)
+			}
+			stmts = generateShardedKeyStringer(msg, stmts, true, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer, shardVarSuffix)
 		} else {
 			stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
 		}
