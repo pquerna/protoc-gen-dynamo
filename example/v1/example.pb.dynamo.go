@@ -265,7 +265,25 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	v2 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	if len(p.GetIdpId()) == 0 {
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "idp_id"))
+	}
+	if len(p.GetEmail()) == 0 {
+		panic(fmt.Sprintf("sharded key: sort key field '%s' cannot be empty", "email"))
+	}
 	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetEmail())
+	pkskStrGsi1 := sb.String()
+	hashValueGsi1 := xxhash.Sum64String(pkskStrGsi1)
+	shardIdGsi1 := hashValueGsi1 & 31
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardIdGsi1), 10))
 	v3 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString(p.GetIdpId())
@@ -277,6 +295,18 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 	_, _ = sb.WriteString(p.GetTenantId())
 	_, _ = sb.WriteString(":")
 	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))
+	pkskStrGsi2 := sb.String()
+	hashValueGsi2 := xxhash.Sum64String(pkskStrGsi2)
+	shardIdGsi2 := hashValueGsi2 & 63
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_user_v_2:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(p.GetIdpId())
+	_, _ = sb.WriteString(":")
+	_, _ = sb.WriteString(strconv.FormatUint(uint64(shardIdGsi2), 10))
 	v5 := &types.AttributeValueMemberS{Value: sb.String()}
 	sb.Reset()
 	_, _ = sb.WriteString(strconv.FormatInt(int64(p.GetAnEnum()), 10))

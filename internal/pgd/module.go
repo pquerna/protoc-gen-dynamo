@@ -93,7 +93,7 @@ func isPowerOfTwo(n uint32) bool {
 }
 
 // validateShardConfig validates that sharding configuration is correct
-func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
+func validateShardConfig(msgName string, key *dynamopb.Key) error {
 	// Presence of shard config means sharded; nothing to validate otherwise.
 	if key == nil || key.Shard == nil {
 		return nil
@@ -101,20 +101,28 @@ func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
 
 	// Validate shard_count is reasonable (>= shardMinLimit and <= shardMaxLimit)
 	if key.Shard.ShardCount < shardMinLimit {
-		return fmt.Errorf("shard_count must be >= %d for message %s (got %d)", shardMinLimit, msg.FullyQualifiedName(), key.Shard.ShardCount)
+		return fmt.Errorf("shard_count must be >= %d for message %s (got %d)", shardMinLimit, msgName, key.Shard.ShardCount)
 	}
 	if key.Shard.ShardCount > shardMaxLimit {
-		return fmt.Errorf("shard_count must be <= %d for message %s (got %d)", shardMaxLimit, msg.FullyQualifiedName(), key.Shard.ShardCount)
+		return fmt.Errorf("shard_count must be <= %d for message %s (got %d)", shardMaxLimit, msgName, key.Shard.ShardCount)
 	}
 
 	// Validate shard_count is a power of 2 to avoid modulo bias
 	if !isPowerOfTwo(key.Shard.ShardCount) {
-		return fmt.Errorf("shard_count must be a power of 2 for message %s (got %d)", msg.FullyQualifiedName(), key.Shard.ShardCount)
+		return fmt.Errorf("shard_count must be a power of 2 for message %s (got %d)", msgName, key.Shard.ShardCount)
+	}
+
+	// A constant sort key cannot be sharded. The shard is derived from the
+	// PK:SK pair, so a constant sk collapses every item sharing the pk_fields
+	// onto one shard -- and since pk+sk is the primary key, that pair can only
+	// ever address a single item. Sharding it is always a configuration error.
+	if key.SkConst != "" {
+		return fmt.Errorf("sharded key cannot use sk_const for message %s: the shard is derived from the pk:sk pair, so a constant sort key always resolves to one shard holding one item; use sk_fields to shard, or drop the shard config", msgName)
 	}
 
 	// For sharded keys, validate that sort key is properly configured
-	if len(key.SkFields) == 0 && key.SkConst == "" {
-		return fmt.Errorf("sharded key must have sort key configured (either sk_fields or sk_const) for message %s", msg.FullyQualifiedName())
+	if len(key.SkFields) == 0 {
+		return fmt.Errorf("sharded key must have sk_fields configured for message %s", msgName)
 	}
 
 	return nil
@@ -293,7 +301,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 		// Validate shard configuration for each key
 		for _, key := range mext.Key {
-			if err := validateShardConfig(msg, key); err != nil {
+			if err := validateShardConfig(msg.FullyQualifiedName(), key); err != nil {
 				m.Logf("Shard configuration validation failed: %s", err)
 				m.Fail("code generation failed")
 			}
@@ -385,7 +393,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 				if keyIndex >= 0 && keyIndex < len(mext.Key) && isShardingEnabled(mext.Key[keyIndex]) {
 					// Use sharded key generation for this partition key
 					ck := mext.Key[keyIndex]
-					stmts = generateShardedKeyStringer(msg, stmts, key.prefix, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer)
+					stmts = generateShardedKeyStringer(msg, stmts, key.prefix, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer, "")
 				} else {
 					stmts = generateKeyStringer(msg, stmts, key.prefix, key.fields, stringBuffer)
 				}
@@ -817,7 +825,15 @@ func generateKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, fiel
 }
 
 // generateShardedKeyStringer generates a sharded partition key by calculating shard based on PK:SK
-func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, pkFields []string, skFields []string, shardConfig *dynamopb.ShardOptions, stringBuffer string) []jen.Code {
+// generateShardedKeyStringer emits the statements that compute a sharded
+// partition key into stringBuffer. varSuffix disambiguates the shard
+// temporaries when more than one sharded key is emitted into the same
+// function scope (the marshal path); pass "" when the statements get a
+// function of their own.
+func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix bool, pkFields []string, skFields []string, shardConfig *dynamopb.ShardOptions, stringBuffer string, varSuffix string) []jen.Code {
+	pkskVar := "pkskStr" + varSuffix
+	hashVar := "hashValue" + varSuffix
+	shardVar := "shardId" + varSuffix
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
 	sep := ":"
 	prefix := ""
@@ -917,8 +933,8 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 	}
 
 	// Calculate shard using 64-bit hash and bitwise masking to avoid modulo bias
-	stmts = append(stmts, jen.Id("pkskStr").Op(":=").Id(stringBuffer).Dot("String").Call())
-	stmts = append(stmts, jen.Id("hashValue").Op(":=").Qual(xxhashPkg, "Sum64String").Call(jen.Id("pkskStr")))
+	stmts = append(stmts, jen.Id(pkskVar).Op(":=").Id(stringBuffer).Dot("String").Call())
+	stmts = append(stmts, jen.Id(hashVar).Op(":=").Qual(xxhashPkg, "Sum64String").Call(jen.Id(pkskVar)))
 	if shardConfig.ShardCount <= shardMinLimit || shardConfig.ShardCount > shardMaxLimit {
 		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be between %d and %d", shardMinLimit, shardMaxLimit))
 	}
@@ -926,7 +942,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		panic(fmt.Sprintf("generateShardedKeyStringer: shard count must be a power of 2 (got %d)", shardConfig.ShardCount))
 	}
 	// Use bitwise AND masking instead of modulo for better performance
-	stmts = append(stmts, jen.Id("shardId").Op(":=").Id("hashValue").Op("&").Lit(int(shardConfig.ShardCount-1)))
+	stmts = append(stmts, jen.Id(shardVar).Op(":=").Id(hashVar).Op("&").Lit(int(shardConfig.ShardCount-1)))
 
 	// Reset the buffer to build the actual partition key with original PK fields first
 	stmts = append(stmts, jen.Id(stringBuffer).Dot("Reset").Call())
@@ -970,7 +986,7 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 		jen.Lit(sep),
 	))
 	stmts = append(stmts, jen.List(jen.Id("_"), jen.Id("_")).Op("=").Id(stringBuffer).Dot("WriteString").Call(
-		jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id("shardId")), jen.Lit(10)),
+		jen.Qual(strconvPkg, "FormatUint").Call(jen.Uint64().Call(jen.Id(shardVar)), jen.Lit(10)),
 	))
 
 	return stmts
@@ -997,7 +1013,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 
 		// Validate shard configuration for each key
 		for _, key := range mext.Key {
-			if err := validateShardConfig(msg, key); err != nil {
+			if err := validateShardConfig(msg.FullyQualifiedName(), key); err != nil {
 				m.Logf("Shard configuration validation failed: %s", err)
 				m.Fail("code generation failed")
 			}
@@ -1144,9 +1160,16 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 		refId++
 		vname := fmt.Sprintf("v%d", refId)
 
-		// Use sharded key generation for primary partition key if sharding is enabled
-		if i == 0 && isShardingEnabled(ck) {
-			stmts = generateShardedKeyStringer(msg, stmts, true, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer)
+		// Use sharded key generation for any partition key with sharding enabled.
+		// This must mirror the <Struct>PartitionKey / <Struct>Gsi<N>PkKey stringers
+		// exactly, or a sharded GSI is written with an unsharded pk and no query
+		// against it can ever match.
+		if isShardingEnabled(ck) {
+			shardVarSuffix := ""
+			if i != 0 {
+				shardVarSuffix = fmt.Sprintf("Gsi%d", i)
+			}
+			stmts = generateShardedKeyStringer(msg, stmts, true, ck.PkFields, ck.SkFields, ck.Shard, stringBuffer, shardVarSuffix)
 		} else {
 			stmts = generateKeyStringer(msg, stmts, true, ck.PkFields, stringBuffer)
 		}
