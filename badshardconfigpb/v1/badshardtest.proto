@@ -63,3 +63,18 @@ message BadUser3 {
   string tenant_id = 1;
   string id = 2;
 }
+
+// Test case 5: sharding a constant sort key (should cause validation error).
+// The shard is derived from the pk:sk pair, so a constant sk pins every item
+// sharing the pk_fields to one shard -- and pk+sk can only address one item.
+message BadUser4 {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_const: "user"  // should cause validation error - cannot shard a constant sk
+    shard: {
+      shard_count: 32
+    }
+  };
+  string tenant_id = 1;
+  string id = 2;
+}

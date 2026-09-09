@@ -93,7 +93,7 @@ func isPowerOfTwo(n uint32) bool {
 }
 
 // validateShardConfig validates that sharding configuration is correct
-func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
+func validateShardConfig(msgName string, key *dynamopb.Key) error {
 	// Presence of shard config means sharded; nothing to validate otherwise.
 	if key == nil || key.Shard == nil {
 		return nil
@@ -101,20 +101,28 @@ func validateShardConfig(msg pgs.Message, key *dynamopb.Key) error {
 
 	// Validate shard_count is reasonable (>= shardMinLimit and <= shardMaxLimit)
 	if key.Shard.ShardCount < shardMinLimit {
-		return fmt.Errorf("shard_count must be >= %d for message %s (got %d)", shardMinLimit, msg.FullyQualifiedName(), key.Shard.ShardCount)
+		return fmt.Errorf("shard_count must be >= %d for message %s (got %d)", shardMinLimit, msgName, key.Shard.ShardCount)
 	}
 	if key.Shard.ShardCount > shardMaxLimit {
-		return fmt.Errorf("shard_count must be <= %d for message %s (got %d)", shardMaxLimit, msg.FullyQualifiedName(), key.Shard.ShardCount)
+		return fmt.Errorf("shard_count must be <= %d for message %s (got %d)", shardMaxLimit, msgName, key.Shard.ShardCount)
 	}
 
 	// Validate shard_count is a power of 2 to avoid modulo bias
 	if !isPowerOfTwo(key.Shard.ShardCount) {
-		return fmt.Errorf("shard_count must be a power of 2 for message %s (got %d)", msg.FullyQualifiedName(), key.Shard.ShardCount)
+		return fmt.Errorf("shard_count must be a power of 2 for message %s (got %d)", msgName, key.Shard.ShardCount)
+	}
+
+	// A constant sort key cannot be sharded. The shard is derived from the
+	// PK:SK pair, so a constant sk collapses every item sharing the pk_fields
+	// onto one shard -- and since pk+sk is the primary key, that pair can only
+	// ever address a single item. Sharding it is always a configuration error.
+	if key.SkConst != "" {
+		return fmt.Errorf("sharded key cannot use sk_const for message %s: the shard is derived from the pk:sk pair, so a constant sort key always resolves to one shard holding one item; use sk_fields to shard, or drop the shard config", msgName)
 	}
 
 	// For sharded keys, validate that sort key is properly configured
-	if len(key.SkFields) == 0 && key.SkConst == "" {
-		return fmt.Errorf("sharded key must have sort key configured (either sk_fields or sk_const) for message %s", msg.FullyQualifiedName())
+	if len(key.SkFields) == 0 {
+		return fmt.Errorf("sharded key must have sk_fields configured for message %s", msgName)
 	}
 
 	return nil
@@ -293,7 +301,7 @@ func (m *Module) applyKeyFuncs(f *jen.File, in pgs.File) error {
 
 		// Validate shard configuration for each key
 		for _, key := range mext.Key {
-			if err := validateShardConfig(msg, key); err != nil {
+			if err := validateShardConfig(msg.FullyQualifiedName(), key); err != nil {
 				m.Logf("Shard configuration validation failed: %s", err)
 				m.Fail("code generation failed")
 			}
@@ -997,7 +1005,7 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 
 		// Validate shard configuration for each key
 		for _, key := range mext.Key {
-			if err := validateShardConfig(msg, key); err != nil {
+			if err := validateShardConfig(msg.FullyQualifiedName(), key); err != nil {
 				m.Logf("Shard configuration validation failed: %s", err)
 				m.Fail("code generation failed")
 			}
