@@ -81,7 +81,7 @@ func (p *Store) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 		"typ":           v7,
 		"value":         v6,
 		"version":       &types.AttributeValueMemberN{Value: (strconv.FormatInt(v5, 10))},
-		"wp":            &types.AttributeValueMemberS{Value: "fast"},
+		"wp":            &types.AttributeValueMemberS{Value: "normal"},
 	}}
 	return av, nil
 }
@@ -164,7 +164,7 @@ func (p *User) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 		"typ":     v9,
 		"value":   v8,
 		"version": &types.AttributeValueMemberN{Value: (strconv.FormatInt(v7, 10))},
-		"wp":      &types.AttributeValueMemberS{Value: "fast"},
+		"wp":      &types.AttributeValueMemberS{Value: "normal"},
 	}}
 	return av, nil
 }
@@ -236,7 +236,7 @@ func (p *StoreV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) 
 		"typ":           v7,
 		"value":         v6,
 		"version":       &types.AttributeValueMemberN{Value: (strconv.FormatInt(v5, 10))},
-		"wp":            &types.AttributeValueMemberS{Value: "fast"},
+		"wp":            &types.AttributeValueMemberS{Value: "normal"},
 	}}
 	return av, nil
 }
@@ -338,7 +338,7 @@ func (p *UserV2) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
 		"typ":     v9,
 		"value":   v8,
 		"version": &types.AttributeValueMemberN{Value: (strconv.FormatInt(v7, 10))},
-		"wp":      &types.AttributeValueMemberS{Value: "fast"},
+		"wp":      &types.AttributeValueMemberS{Value: "normal"},
 	}}
 	return av, nil
 }
@@ -381,7 +381,7 @@ func (p *BulkRecord) MarshalDynamoDBAttributeValue() (types.AttributeValue, erro
 		"sk":    v2,
 		"typ":   v4,
 		"value": v3,
-		"wp":    &types.AttributeValueMemberS{Value: "slow"},
+		"wp":    &types.AttributeValueMemberS{Value: "background"},
 	}}
 	return av, nil
 }
@@ -1097,11 +1097,11 @@ func BulkRecordSortKey(id *string) string {
 func (_ *Store) Unsharded() {}
 
 func StoreDefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_FAST
+	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
 func (p *Store) DynamoDefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_FAST
+	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
 func (p *User) GetShardFromPartitionKey() (uint32, error) {
@@ -1127,21 +1127,21 @@ func UserShardCount() uint32 {
 }
 
 func UserDefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_FAST
+	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
 func (p *User) DynamoDefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_FAST
+	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
 func (_ *StoreV2) Unsharded() {}
 
 func StoreV2DefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_FAST
+	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
 func (p *StoreV2) DynamoDefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_FAST
+	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
 func (_ *UserV2) Unsharded() {}
@@ -1191,19 +1191,19 @@ func UserV2Gsi2ShardCount() uint32 {
 }
 
 func UserV2DefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_FAST
+	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
 func (p *UserV2) DynamoDefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_FAST
+	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
 func (_ *BulkRecord) Unsharded() {}
 
 func BulkRecordDefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_SLOW
+	return dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND
 }
 
 func (p *BulkRecord) DynamoDefaultWritePriority() dynamov1.WritePriority {
-	return dynamov1.WritePriority_WRITE_PRIORITY_SLOW
+	return dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND
 }

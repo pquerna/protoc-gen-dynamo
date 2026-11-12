@@ -40,7 +40,7 @@ func TestWritePriorityRoundTrip(t *testing.T) {
 		p := dynamov1.WritePriority(values.Get(i).Number())
 		want := p
 		if p == dynamov1.WritePriority_WRITE_PRIORITY_UNSPECIFIED {
-			want = dynamov1.WritePriority_WRITE_PRIORITY_FAST
+			want = dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 		}
 		got, ok := ParseWritePriority(WritePriorityAttrValue(p))
 		if !ok || got != want {
@@ -51,10 +51,10 @@ func TestWritePriorityRoundTrip(t *testing.T) {
 
 func TestWritePriorityAttrValues(t *testing.T) {
 	cases := map[dynamov1.WritePriority]string{
-		dynamov1.WritePriority_WRITE_PRIORITY_UNSPECIFIED: "fast",
-		dynamov1.WritePriority_WRITE_PRIORITY_FAST:        "fast",
-		dynamov1.WritePriority_WRITE_PRIORITY_SLOW:        "slow",
-		dynamov1.WritePriority(999):                       "fast",
+		dynamov1.WritePriority_WRITE_PRIORITY_UNSPECIFIED: "normal",
+		dynamov1.WritePriority_WRITE_PRIORITY_NORMAL:      "normal",
+		dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND:  "background",
+		dynamov1.WritePriority(999):                       "normal",
 	}
 	for p, want := range cases {
 		if got := WritePriorityAttrValue(p); got != want {
@@ -64,7 +64,7 @@ func TestWritePriorityAttrValues(t *testing.T) {
 }
 
 func TestParseWritePriorityUnknown(t *testing.T) {
-	for _, s := range []string{"", "bogus", "FAST"} {
+	for _, s := range []string{"", "bogus", "NORMAL"} {
 		if p, ok := ParseWritePriority(s); ok {
 			t.Errorf("ParseWritePriority(%q) = %s, true; want ok=false", s, p)
 		}
@@ -77,17 +77,17 @@ func TestSetGetWritePriority(t *testing.T) {
 		t.Fatal("GetWritePriority on empty item: want ok=false")
 	}
 
-	SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_SLOW)
-	if p, ok := GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_SLOW {
-		t.Fatalf("after set SLOW: got %s, %v", p, ok)
+	SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND)
+	if p, ok := GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND {
+		t.Fatalf("after set BACKGROUND: got %s, %v", p, ok)
 	}
 
-	SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_FAST)
-	if p, ok := GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_FAST {
-		t.Fatalf("after overwrite FAST: got %s, %v", p, ok)
+	SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_NORMAL)
+	if p, ok := GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_NORMAL {
+		t.Fatalf("after overwrite NORMAL: got %s, %v", p, ok)
 	}
-	if s := item[WritePriorityAttr].(*types.AttributeValueMemberS).Value; s != "fast" {
-		t.Fatalf("stored value = %q, want %q", s, "fast")
+	if s := item[WritePriorityAttr].(*types.AttributeValueMemberS).Value; s != "normal" {
+		t.Fatalf("stored value = %q, want %q", s, "normal")
 	}
 
 	item[WritePriorityAttr] = &types.AttributeValueMemberN{Value: "1"}

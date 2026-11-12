@@ -14,9 +14,9 @@ func TestWritePriorityAttrValue(t *testing.T) {
 		p    dynamopb.WritePriority
 		want string
 	}{
-		{name: "unspecified resolves to fast", p: dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED, want: "fast"},
-		{name: "fast", p: dynamopb.WritePriority_WRITE_PRIORITY_FAST, want: "fast"},
-		{name: "slow", p: dynamopb.WritePriority_WRITE_PRIORITY_SLOW, want: "slow"},
+		{name: "unspecified resolves to normal", p: dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED, want: "normal"},
+		{name: "normal", p: dynamopb.WritePriority_WRITE_PRIORITY_NORMAL, want: "normal"},
+		{name: "background", p: dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND, want: "background"},
 	}
 
 	for _, tc := range cases {
@@ -176,9 +176,9 @@ func TestValidateWritePriority(t *testing.T) {
 	}{
 		{name: "keyless, unset", mext: &dynamopb.DynamoMessageOptions{}},
 		{name: "keyed, unset", mext: &dynamopb.DynamoMessageOptions{Key: keyed}},
-		{name: "keyed, slow", mext: &dynamopb.DynamoMessageOptions{Key: keyed, WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_SLOW}},
-		{name: "keyless, slow", mext: &dynamopb.DynamoMessageOptions{WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_SLOW}, wantErr: true},
-		{name: "keyless, fast", mext: &dynamopb.DynamoMessageOptions{WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_FAST}, wantErr: true},
+		{name: "keyed, background", mext: &dynamopb.DynamoMessageOptions{Key: keyed, WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND}},
+		{name: "keyless, background", mext: &dynamopb.DynamoMessageOptions{WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND}, wantErr: true},
+		{name: "keyless, normal", mext: &dynamopb.DynamoMessageOptions{WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_NORMAL}, wantErr: true},
 	}
 
 	for _, tc := range cases {

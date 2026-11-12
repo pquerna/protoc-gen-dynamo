@@ -83,7 +83,7 @@ const (
 )
 
 // writePriorityAttrValue returns the stored string for the message's default
-// write priority. UNSPECIFIED resolves to FAST. The string comes from the
+// write priority. UNSPECIFIED resolves to NORMAL. The string comes from the
 // (dynamo.v1.attr_value) option on the compiled-in enum, so stored values ship
 // with the plugin version.
 func writePriorityAttrValue(mext *dynamopb.DynamoMessageOptions) (string, error) {

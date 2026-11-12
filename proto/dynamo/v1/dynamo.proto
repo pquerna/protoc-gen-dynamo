@@ -35,10 +35,10 @@ extend google.protobuf.EnumValueOptions {
 // not the object: change-stream consumers use it to tell high-priority writes
 // from bulk ones. It is not part of the message and is ignored on unmarshal.
 enum WritePriority {
-  // Treated as FAST. Exists so an unset option has a defined meaning.
+  // Treated as NORMAL. Exists so an unset option has a defined meaning.
   WRITE_PRIORITY_UNSPECIFIED = 0;
-  WRITE_PRIORITY_FAST = 1 [(dynamo.v1.attr_value) = "fast"];
-  WRITE_PRIORITY_SLOW = 2 [(dynamo.v1.attr_value) = "slow"];
+  WRITE_PRIORITY_NORMAL = 1 [(dynamo.v1.attr_value) = "normal"];
+  WRITE_PRIORITY_BACKGROUND = 2 [(dynamo.v1.attr_value) = "background"];
 }
 
 message Key {

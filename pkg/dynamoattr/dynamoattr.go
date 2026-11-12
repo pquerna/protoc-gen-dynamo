@@ -33,13 +33,13 @@ func init() {
 }
 
 // WritePriorityAttrValue returns the stored string for p. UNSPECIFIED maps to
-// the FAST value. A value unknown to this build (e.g. an out-of-range cast)
-// also maps to FAST.
+// the NORMAL value. A value unknown to this build (e.g. an out-of-range cast)
+// also maps to NORMAL.
 func WritePriorityAttrValue(p dynamov1.WritePriority) string {
 	if s, ok := p.AttrValue(); ok {
 		return s
 	}
-	s, _ := dynamov1.WritePriority_WRITE_PRIORITY_FAST.AttrValue()
+	s, _ := dynamov1.WritePriority_WRITE_PRIORITY_NORMAL.AttrValue()
 	return s
 }
 

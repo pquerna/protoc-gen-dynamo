@@ -39,18 +39,18 @@ func TestWritePriorityMarshalled(t *testing.T) {
 		want     string
 	}{
 		{
-			name:     "default message is fast",
+			name:     "default message is normal",
 			marshal:  user.MarshalDynamoItem,
 			accessor: user.DynamoDefaultWritePriority(),
 			static:   v1.UserV2DefaultWritePriority(),
-			want:     "fast",
+			want:     "normal",
 		},
 		{
-			name:     "slow message is slow",
+			name:     "background message is background",
 			marshal:  bulk.MarshalDynamoItem,
 			accessor: bulk.DynamoDefaultWritePriority(),
 			static:   v1.BulkRecordDefaultWritePriority(),
-			want:     "slow",
+			want:     "background",
 		},
 	}
 
@@ -104,7 +104,7 @@ func TestWritePriorityIgnoredOnUnmarshal(t *testing.T) {
 			item[dynamoattr.WritePriorityAttr] = &types.AttributeValueMemberS{Value: "bogus"}
 		},
 		"overridden": func(item map[string]types.AttributeValue) {
-			dynamoattr.SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_FAST)
+			dynamoattr.SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_NORMAL)
 		},
 	}
 
@@ -132,11 +132,11 @@ func TestWritePriorityOverride(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	if p, ok := dynamoattr.GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_SLOW {
-		t.Fatalf("default: got %s, %v; want SLOW", p, ok)
+	if p, ok := dynamoattr.GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND {
+		t.Fatalf("default: got %s, %v; want BACKGROUND", p, ok)
 	}
-	dynamoattr.SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_FAST)
-	if p, ok := dynamoattr.GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_FAST {
-		t.Fatalf("override: got %s, %v; want FAST", p, ok)
+	dynamoattr.SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_NORMAL)
+	if p, ok := dynamoattr.GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_NORMAL {
+		t.Fatalf("override: got %s, %v; want NORMAL", p, ok)
 	}
 }

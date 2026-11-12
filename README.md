@@ -182,16 +182,16 @@ Each keyed message has a default, set with `(dynamo.v1.msg).write_priority`:
 ```protobuf
 message BulkRecord {
   option (dynamo.v1.msg).key = {pk_fields: ["tenant_id"] sk_fields: ["id"]};
-  option (dynamo.v1.msg).write_priority = WRITE_PRIORITY_SLOW;
+  option (dynamo.v1.msg).write_priority = WRITE_PRIORITY_BACKGROUND;
   ...
 }
 ```
 
 | Value | Stored as |
 |---|---|
-| `WRITE_PRIORITY_UNSPECIFIED` (the default) | `"fast"` |
-| `WRITE_PRIORITY_FAST` | `"fast"` |
-| `WRITE_PRIORITY_SLOW` | `"slow"` |
+| `WRITE_PRIORITY_UNSPECIFIED` (the default) | `"normal"` |
+| `WRITE_PRIORITY_NORMAL` | `"normal"` |
+| `WRITE_PRIORITY_BACKGROUND` | `"background"` |
 
 The stored strings are pinned by the `(dynamo.v1.attr_value)` option on each
 enum value and are a permanent data contract. New values may be added; existing
@@ -207,7 +207,7 @@ it back:
 ```go
 item, err := rec.MarshalDynamoItem()
 // ...
-dynamoattr.SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_FAST)
+dynamoattr.SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_NORMAL)
 
 // In a stream consumer, from the "wp" S value of the new image:
 p, ok := dynamoattr.ParseWritePriority(s)
