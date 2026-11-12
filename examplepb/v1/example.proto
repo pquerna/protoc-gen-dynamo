@@ -59,9 +59,7 @@ message User {
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
     sk_fields: ["id"]
-    shard: {
-      shard_count: 32
-    }
+    shard: {shard_count: 32}
   };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
@@ -143,19 +141,19 @@ message UserV2 {
   };
   option (dynamo.v1.msg).key = {
     pk_fields: ["tenant_id"]
-    sk_fields: ["idp_id", "email"]
-    shard: {
-      shard_count: 32
-    }
+    sk_fields: [
+      "idp_id",
+      "email"
+    ]
+    shard: {shard_count: 32}
   };
   option (dynamo.v1.msg).key = {
-    pk_fields: ["tenant_id", "idp_id"]
-    sk_fields: [
-      "an_enum"
+    pk_fields: [
+      "tenant_id",
+      "idp_id"
     ]
-    shard: {
-      shard_count: 64
-    }
+    sk_fields: ["an_enum"]
+    shard: {shard_count: 64}
   };
   string tenant_id = 1;
   string id = 2;
@@ -166,4 +164,34 @@ message UserV2 {
   string display_name = 7;
   string email = 8;
   BasicEnum an_enum = 9;
+}
+
+// Bulk-written records: changes default to the background processing lane.
+message BulkRecord {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  option (dynamo.v1.msg).write_priority = WRITE_PRIORITY_BACKGROUND;
+  string tenant_id = 1;
+  string id = 2;
+  string payload = 3;
+}
+
+// Audit entries: always processed in the background lane. The priority is
+// pinned, so no per-write override is generated.
+message AuditEntry {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  option (dynamo.v1.msg).pinned_write_priority = WRITE_PRIORITY_BACKGROUND;
+  string tenant_id = 1;
+  string id = 2;
+  string action = 3;
+}
+
+// Keyless: only ever embedded, never written as a top-level item.
+message StoreRef {
+  string id = 1;
 }

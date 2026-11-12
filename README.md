@@ -150,6 +150,98 @@ When serialized, this will generate the following DynamodDB Attributes:
 }
 ```
 
+## Item attributes
+
+The generator writes these top-level attributes on each item, in addition to
+exposed fields:
+
+| Attribute | Type | When |
+|---|---|---|
+| `pk`, `sk` | S | The first `(dynamo.v1.msg).key` |
+| `gsiNpk`, `gsiNsk` | S | Each further key, N = 1, 2, … |
+| `typ` | S | Always: the fully-qualified message name |
+| `value` | B | Always: the zstd-compressed message |
+| `version` | N | The message has an `updated_at` timestamp |
+| `deleted` | BOOL | The message has a `deleted_at` timestamp |
+| `wp` | S | The message has at least one key |
+
+An exposed field cannot use any of these names for its message, either through
+its snake-case name or `(dynamo.v1.field).name`. Codegen fails with an error
+naming the field and the attribute. Names are only reserved where they are
+emitted, so for example `version` is free on a message without `updated_at`.
+
+### Write priority
+
+`wp` is the priority of the write. It is stamped on the item only so that
+DynamoDB Streams consumers can see it on the change record: it characterizes
+how the change should be processed, not the object. It is not part of the
+message, is not on the Go struct, and is ignored on unmarshal.
+
+Each keyed message sets its priority with one of two options (they are a
+`oneof`; setting neither means NORMAL, overridable):
+
+- `(dynamo.v1.msg).write_priority`: a default. A single write may override it.
+- `(dynamo.v1.msg).pinned_write_priority`: fixed for the type. No override
+  method is generated, so a per-write override does not compile. It may not be
+  `WRITE_PRIORITY_UNSPECIFIED`.
+
+```protobuf
+message BulkRecord {
+  option (dynamo.v1.msg).key = {pk_fields: ["tenant_id"] sk_fields: ["id"]};
+  option (dynamo.v1.msg).write_priority = WRITE_PRIORITY_BACKGROUND;
+  ...
+}
+
+message AuditEntry {
+  option (dynamo.v1.msg).key = {pk_fields: ["tenant_id"] sk_fields: ["id"]};
+  option (dynamo.v1.msg).pinned_write_priority = WRITE_PRIORITY_BACKGROUND;
+  ...
+}
+```
+
+Either option on a keyless message is an error.
+
+| Value | Stored as |
+|---|---|
+| `WRITE_PRIORITY_UNSPECIFIED` (the default) | `"normal"` |
+| `WRITE_PRIORITY_NORMAL` | `"normal"` |
+| `WRITE_PRIORITY_BACKGROUND` | `"background"` |
+
+The stored strings are fixed by the `(dynamo.v1.attr_value)` option on each
+enum value and are a permanent data contract. New values may be added; existing
+strings are never changed.
+
+For every keyed message the generator emits:
+
+- `<Struct>DefaultWritePriority()` and `(*<Struct>).DynamoDefaultWritePriority()`,
+  which return the resolved priority (never UNSPECIFIED; the pinned value for a
+  pinned type).
+- `(*<Struct>).DynamoWritePriorityPinned() bool`.
+
+For keyed messages that are not pinned it also emits
+`(*<Struct>).MarshalDynamoItemWithPriority(dynamov1.WritePriority)`, which
+marshals the item with `wp` set to the given priority (UNSPECIFIED or an unknown
+value is stored as `"normal"`). There is no generic setter on raw items; use
+this method to override the priority of a single write.
+
+```go
+item, err := rec.MarshalDynamoItemWithPriority(dynamov1.WritePriority_WRITE_PRIORITY_NORMAL)
+```
+
+Use `pkg/dynamoattr` to read it back:
+
+```go
+// From a marshalled item:
+p, ok := dynamoattr.GetWritePriority(item)
+
+// In a stream consumer, from the "wp" S value of the new image:
+p, ok := dynamoattr.ParseWritePriority(s)
+if !ok {
+	// Missing (written before wp existed) or written by a newer producer.
+	// Tolerate it; do not fail the record.
+}
+```
+
 ## License
 
 `protoc-gen-dynamo` is licensed under the [Apache License, Version 2.0](./LICENSE)

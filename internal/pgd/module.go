@@ -77,9 +77,102 @@ const (
 	timePkg      = "time"
 	protozstdPkg = "github.com/pquerna/protoc-gen-dynamo/pkg/protozstd"
 	xxhashPkg    = "github.com/cespare/xxhash/v2"
+	dynamoV1Pkg  = "github.com/pquerna/protoc-gen-dynamo/dynamo/v1"
 
 	timestampType = "google.protobuf.Timestamp"
 )
+
+// writePriorityPinned reports whether the message sets pinned_write_priority.
+func writePriorityPinned(mext *dynamopb.DynamoMessageOptions) bool {
+	_, ok := mext.GetPriority().(*dynamopb.DynamoMessageOptions_PinnedWritePriority)
+	return ok
+}
+
+// effectiveWritePriority returns the message's write priority from whichever
+// member of the priority oneof is set, with UNSPECIFIED (including neither
+// set) resolved to NORMAL.
+func effectiveWritePriority(mext *dynamopb.DynamoMessageOptions) dynamopb.WritePriority {
+	if writePriorityPinned(mext) {
+		return mext.GetPinnedWritePriority().Resolved()
+	}
+	return mext.GetWritePriority().Resolved()
+}
+
+// writePriorityAttrValue returns the stored string for the message's effective
+// write priority. The string comes from the (dynamo.v1.attr_value) option on
+// the compiled-in enum, so stored values ship with the plugin version.
+func writePriorityAttrValue(mext *dynamopb.DynamoMessageOptions) (string, error) {
+	p := effectiveWritePriority(mext)
+	s, ok := p.AttrValue()
+	if !ok {
+		return "", fmt.Errorf("write priority %s has no (dynamo.v1.attr_value)", p)
+	}
+	return s, nil
+}
+
+// validateWritePriority rejects write_priority or pinned_write_priority on a
+// keyless message, and a pinned_write_priority of UNSPECIFIED. Keyless
+// messages are only ever embedded, never written as items, so there is nothing
+// to stamp and the option would otherwise be silently ignored.
+func validateWritePriority(msgName string, mext *dynamopb.DynamoMessageOptions) error {
+	pinned := writePriorityPinned(mext)
+	if len(mext.GetKey()) == 0 {
+		if mext.GetWritePriority() != dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED {
+			return fmt.Errorf("write_priority is set on message %s, which has no key: only keyed messages are written as items, and an embedded message does not pass its priority to its parent", msgName)
+		}
+		if pinned {
+			return fmt.Errorf("pinned_write_priority is set on message %s, which has no key: only keyed messages are written as items, and an embedded message does not pass its priority to its parent", msgName)
+		}
+	}
+	if pinned && mext.GetPinnedWritePriority() == dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED {
+		return fmt.Errorf("pinned_write_priority is WRITE_PRIORITY_UNSPECIFIED on message %s: a pinned priority must name a value", msgName)
+	}
+	return nil
+}
+
+// attributeName returns the DynamoDB attribute name for an exposed field: its
+// (dynamo.v1.field).name if set, otherwise its snake-case name.
+func attributeName(field pgs.Field, fext *dynamopb.DynamoFieldOptions) string {
+	if fext.Name != "" {
+		return fext.Name
+	}
+	return field.Name().LowerSnakeCase().String()
+}
+
+// emittedAttributeNames lists the top-level attributes the generator writes
+// for a message, outside of exposed fields.
+func emittedAttributeNames(mext *dynamopb.DynamoMessageOptions, hasVersion bool, hasDeleted bool) []string {
+	var names []string
+	for i := range mext.GetKey() {
+		if i == 0 {
+			names = append(names, "pk", "sk")
+		} else {
+			names = append(names, fmt.Sprintf("gsi%dpk", i), fmt.Sprintf("gsi%dsk", i))
+		}
+	}
+	names = append(names, valueField, typeField)
+	if hasVersion {
+		names = append(names, versionField)
+	}
+	if hasDeleted {
+		names = append(names, deletedField)
+	}
+	if len(mext.GetKey()) > 0 {
+		names = append(names, writePriorityField)
+	}
+	return names
+}
+
+// validateAttributeNames reports exposed fields whose DynamoDB attribute name
+// collides with an attribute the generator emits for this message.
+func validateAttributeNames(msgName string, emitted []string, exposed map[string]string /* attr -> field FQN */) error {
+	for _, attr := range emitted {
+		if field, ok := exposed[attr]; ok {
+			return fmt.Errorf("exposed field %s on message %s uses attribute name %q, which the generator already emits for this message; set (dynamo.v1.field).name to a different name", field, msgName, attr)
+		}
+	}
+	return nil
+}
 
 // isShardingEnabled checks if sharding is enabled for a key. Presence of a
 // shard config means sharded — there is no separate opt-in flag.
@@ -145,6 +238,7 @@ func (m *Module) applyTemplate(buf *bytes.Buffer, in pgs.File) error {
 	f.ImportName(timePkg, "time")
 	f.ImportName(protozstdPkg, "protozstd")
 	f.ImportName(xxhashPkg, "xxhash")
+	f.ImportAlias(dynamoV1Pkg, "dynamov1")
 
 	err := m.applyMarshal(f, in)
 	if err != nil {
@@ -779,6 +873,56 @@ func (m *Module) applyUtilityFuncs(f *jen.File, in pgs.File) error {
 				jen.Return(jen.Lit(int(ck.Shard.ShardCount))),
 			).Line()
 		}
+
+		// Write priority for changes to this type. Keyless messages are never
+		// top-level items, so they carry no priority.
+		if len(mext.Key) > 0 {
+			pinned := writePriorityPinned(&mext)
+			wp := jen.Qual(dynamoV1Pkg, "WritePriority_"+effectiveWritePriority(&mext).String())
+
+			f.Func().Id(structName.String()+"DefaultWritePriority").Params().Qual(dynamoV1Pkg, "WritePriority").Block(
+				jen.Return(wp.Clone()),
+			).Line()
+
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id("DynamoDefaultWritePriority").Params().Qual(dynamoV1Pkg, "WritePriority").Block(
+				jen.Return(wp.Clone()),
+			).Line()
+
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id("DynamoWritePriorityPinned").Params().Bool().Block(
+				jen.Return(jen.Lit(pinned)),
+			).Line()
+
+			// Per-write override, only for unpinned types: its absence on a
+			// pinned type is what keeps callers from overriding the priority.
+			if !pinned {
+				normal, ok := dynamopb.WritePriority_WRITE_PRIORITY_NORMAL.AttrValue()
+				if !ok {
+					return fmt.Errorf("WRITE_PRIORITY_NORMAL has no (dynamo.v1.attr_value)")
+				}
+				f.Func().Params(
+					jen.Id("p").Op("*").Id(structName.String()),
+				).Id("MarshalDynamoItemWithPriority").Params(
+					jen.Id("priority").Qual(dynamoV1Pkg, "WritePriority"),
+				).Params(jen.Map(jen.String()).Qual(dynamoV2Pkg, "AttributeValue"), jen.Error()).Block(
+					jen.List(jen.Id("item"), jen.Id("err")).Op(":=").Id("p").Dot("MarshalDynamoItem").Call(),
+					jen.If(jen.Id("err").Op("!=").Nil()).Block(
+						jen.Return(jen.Nil(), jen.Id("err")),
+					),
+					jen.List(jen.Id("wp"), jen.Id("ok")).Op(":=").Id("priority").Dot("AttrValue").Call(),
+					jen.If(jen.Op("!").Id("ok")).Block(
+						jen.Id("wp").Op("=").Lit(normal),
+					),
+					jen.Id("item").Index(jen.Lit(writePriorityField)).Op("=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
+						jen.Id("Value"): jen.Id("wp"),
+					}),
+					jen.Return(jen.Id("item"), jen.Nil()),
+				).Line()
+			}
+		}
 	}
 
 	return nil
@@ -993,10 +1137,46 @@ func generateShardedKeyStringer(msg pgs.Message, stmts []jen.Code, addPrefix boo
 }
 
 const (
-	valueField   = "value"
-	deletedField = "deleted"
-	typeField    = "typ"
+	valueField         = "value"
+	deletedField       = "deleted"
+	typeField          = "typ"
+	versionField       = "version"
+	writePriorityField = "wp"
 )
+
+// hasDeletedField reports whether the message has a deleted_at timestamp, for
+// which the generator emits the "deleted" attribute.
+func hasDeletedField(msg pgs.Message) bool {
+	for _, field := range msg.Fields() {
+		if strings.HasSuffix(field.Descriptor().GetTypeName(), timestampType) &&
+			field.Name().LowerSnakeCase().String() == "deleted_at" {
+			return true
+		}
+	}
+	return false
+}
+
+// exposedAttributeNames maps each exposed field's DynamoDB attribute name to
+// the field's fully-qualified name.
+func exposedAttributeNames(msg pgs.Message) (map[string]string, error) {
+	exposed := map[string]string{}
+	for _, field := range msg.Fields() {
+		fext := dynamopb.DynamoFieldOptions{}
+		ok, err := field.Extension(dynamopb.E_Field, &fext)
+		if err != nil {
+			return nil, fmt.Errorf("parsing dynamo.field failed for '%s': %w", field.FullyQualifiedName(), err)
+		}
+		if !ok || !fext.Expose {
+			continue
+		}
+		attr := attributeName(field, &fext)
+		if prev, dup := exposed[attr]; dup {
+			return nil, fmt.Errorf("exposed fields %s and %s both use attribute name %q", prev, field.FullyQualifiedName(), attr)
+		}
+		exposed[attr] = field.FullyQualifiedName()
+	}
+	return exposed, nil
+}
 
 func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 	for _, msg := range in.AllMessages() {
@@ -1017,6 +1197,19 @@ func (m *Module) applyMarshal(f *jen.File, in pgs.File) error {
 				m.Logf("Shard configuration validation failed: %s", err)
 				m.Fail("code generation failed")
 			}
+		}
+
+		if err := validateWritePriority(msg.FullyQualifiedName(), &mext); err != nil {
+			m.Failf("Write priority validation failed: %s", err)
+		}
+
+		exposed, err := exposedAttributeNames(msg)
+		if err != nil {
+			m.Failf("Attribute name validation failed: %s", err)
+		}
+		emitted := emittedAttributeNames(&mext, getVersionField(msg) != nil, hasDeletedField(msg))
+		if err := validateAttributeNames(msg.FullyQualifiedName(), emitted, exposed); err != nil {
+			m.Failf("Attribute name validation failed: %s", err)
 		}
 
 		// https://pkg.go.dev/github.com/guregu/dynamo/v2#Marshaler
@@ -1203,7 +1396,7 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 				jen.Return(jen.Nil(), jen.Id("err")),
 			),
 		)
-		d[jen.Lit("version")] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberN").Values(jen.Dict{
+		d[jen.Lit(versionField)] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberN").Values(jen.Dict{
 			jen.Id("Value"): jen.Call(jen.Qual(strconvPkg, "FormatInt").Call(jen.Id(vname), jen.Lit(10))),
 		})
 	}
@@ -1235,6 +1428,18 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 		jen.Id("Value"): jen.Lit(typeName),
 	}))
 	d[jen.Lit(typeField)] = jen.Id(typeVarName)
+
+	// Default priority for processing this write. Only keyed messages are
+	// written as top-level items; callers override it on the marshalled item.
+	if len(mext.Key) > 0 {
+		wpValue, err := writePriorityAttrValue(mext)
+		if err != nil {
+			m.Failf("Resolving write_priority failed for %s: %s", msg.FullyQualifiedName(), err)
+		}
+		d[jen.Lit(writePriorityField)] = jen.Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
+			jen.Id("Value"): jen.Lit(wpValue),
+		})
+	}
 
 	for _, field := range msg.Fields() {
 		fieldDescriptorName := field.Descriptor().GetTypeName()
@@ -1283,10 +1488,7 @@ func (m *Module) applyMarshalMsgV2(f *jen.File, msg pgs.Message, mext *dynamopb.
 		}
 
 		avt := getAVType(field, &fext)
-		fieldName := jen.Lit(field.Name().LowerSnakeCase().String())
-		if fext.Name != "" {
-			fieldName = jen.Lit(fext.Name)
-		}
+		fieldName := jen.Lit(attributeName(field, &fext))
 
 		switch avt {
 		case avt_bytes:
