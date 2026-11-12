@@ -177,7 +177,13 @@ DynamoDB Streams consumers can see it on the change record: it characterizes
 how the change should be processed, not the object. It is not part of the
 message, is not on the Go struct, and is ignored on unmarshal.
 
-Each keyed message has a default, set with `(dynamo.v1.msg).write_priority`:
+Each keyed message sets its priority with one of two options (they are a
+`oneof`; setting neither means NORMAL, overridable):
+
+- `(dynamo.v1.msg).write_priority`: a default. A single write may override it.
+- `(dynamo.v1.msg).pinned_write_priority`: fixed for the type. No override
+  method is generated, so a per-write override does not compile. It may not be
+  `WRITE_PRIORITY_UNSPECIFIED`.
 
 ```protobuf
 message BulkRecord {
@@ -185,7 +191,15 @@ message BulkRecord {
   option (dynamo.v1.msg).write_priority = WRITE_PRIORITY_BACKGROUND;
   ...
 }
+
+message AuditEntry {
+  option (dynamo.v1.msg).key = {pk_fields: ["tenant_id"] sk_fields: ["id"]};
+  option (dynamo.v1.msg).pinned_write_priority = WRITE_PRIORITY_BACKGROUND;
+  ...
+}
 ```
+
+Either option on a keyless message is an error.
 
 | Value | Stored as |
 |---|---|
@@ -193,21 +207,32 @@ message BulkRecord {
 | `WRITE_PRIORITY_NORMAL` | `"normal"` |
 | `WRITE_PRIORITY_BACKGROUND` | `"background"` |
 
-The stored strings are pinned by the `(dynamo.v1.attr_value)` option on each
+The stored strings are fixed by the `(dynamo.v1.attr_value)` option on each
 enum value and are a permanent data contract. New values may be added; existing
 strings are never changed.
 
-The generator emits `<Struct>DefaultWritePriority()` and
-`(*<Struct>).DynamoDefaultWritePriority()`, which return the resolved default
-(never UNSPECIFIED).
+For every keyed message the generator emits:
 
-Use `pkg/dynamoattr` to change the priority of an individual write or to read
-it back:
+- `<Struct>DefaultWritePriority()` and `(*<Struct>).DynamoDefaultWritePriority()`,
+  which return the resolved priority (never UNSPECIFIED; the pinned value for a
+  pinned type).
+- `(*<Struct>).DynamoWritePriorityPinned() bool`.
+
+For keyed messages that are not pinned it also emits
+`(*<Struct>).MarshalDynamoItemWithPriority(dynamov1.WritePriority)`, which
+marshals the item with `wp` set to the given priority (UNSPECIFIED or an unknown
+value is stored as `"normal"`). There is no generic setter on raw items; use
+this method to override the priority of a single write.
 
 ```go
-item, err := rec.MarshalDynamoItem()
-// ...
-dynamoattr.SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_NORMAL)
+item, err := rec.MarshalDynamoItemWithPriority(dynamov1.WritePriority_WRITE_PRIORITY_NORMAL)
+```
+
+Use `pkg/dynamoattr` to read it back:
+
+```go
+// From a marshalled item:
+p, ok := dynamoattr.GetWritePriority(item)
 
 // In a stream consumer, from the "wp" S value of the new image:
 p, ok := dynamoattr.ParseWritePriority(s)

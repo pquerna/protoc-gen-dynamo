@@ -1739,6 +1739,152 @@ func (b0 BulkRecord_builder) Build() *BulkRecord {
 	return m0
 }
 
+// Audit entries: always processed in the background lane. The priority is
+// pinned, so no per-write override is generated.
+type AuditEntry struct {
+	state                  protoimpl.MessageState `protogen:"opaque.v1"`
+	xxx_hidden_TenantId    *string                `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId"`
+	xxx_hidden_Id          *string                `protobuf:"bytes,2,opt,name=id"`
+	xxx_hidden_Action      *string                `protobuf:"bytes,3,opt,name=action"`
+	XXX_raceDetectHookData protoimpl.RaceDetectHookData
+	XXX_presence           [1]uint32
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *AuditEntry) Reset() {
+	*x = AuditEntry{}
+	mi := &file_v1_example_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AuditEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AuditEntry) ProtoMessage() {}
+
+func (x *AuditEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_v1_example_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+func (x *AuditEntry) GetTenantId() string {
+	if x != nil {
+		if x.xxx_hidden_TenantId != nil {
+			return *x.xxx_hidden_TenantId
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *AuditEntry) GetId() string {
+	if x != nil {
+		if x.xxx_hidden_Id != nil {
+			return *x.xxx_hidden_Id
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *AuditEntry) GetAction() string {
+	if x != nil {
+		if x.xxx_hidden_Action != nil {
+			return *x.xxx_hidden_Action
+		}
+		return ""
+	}
+	return ""
+}
+
+func (x *AuditEntry) SetTenantId(v string) {
+	x.xxx_hidden_TenantId = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 0, 3)
+}
+
+func (x *AuditEntry) SetId(v string) {
+	x.xxx_hidden_Id = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 1, 3)
+}
+
+func (x *AuditEntry) SetAction(v string) {
+	x.xxx_hidden_Action = &v
+	protoimpl.X.SetPresent(&(x.XXX_presence[0]), 2, 3)
+}
+
+func (x *AuditEntry) HasTenantId() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 0)
+}
+
+func (x *AuditEntry) HasId() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 1)
+}
+
+func (x *AuditEntry) HasAction() bool {
+	if x == nil {
+		return false
+	}
+	return protoimpl.X.Present(&(x.XXX_presence[0]), 2)
+}
+
+func (x *AuditEntry) ClearTenantId() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 0)
+	x.xxx_hidden_TenantId = nil
+}
+
+func (x *AuditEntry) ClearId() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 1)
+	x.xxx_hidden_Id = nil
+}
+
+func (x *AuditEntry) ClearAction() {
+	protoimpl.X.ClearPresent(&(x.XXX_presence[0]), 2)
+	x.xxx_hidden_Action = nil
+}
+
+type AuditEntry_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+	TenantId *string
+	Id       *string
+	Action   *string
+}
+
+func (b0 AuditEntry_builder) Build() *AuditEntry {
+	m0 := &AuditEntry{}
+	b, x := &b0, m0
+	_, _ = b, x
+	if b.TenantId != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 0, 3)
+		x.xxx_hidden_TenantId = b.TenantId
+	}
+	if b.Id != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 1, 3)
+		x.xxx_hidden_Id = b.Id
+	}
+	if b.Action != nil {
+		protoimpl.X.SetPresentNonAtomic(&(x.XXX_presence[0]), 2, 3)
+		x.xxx_hidden_Action = b.Action
+	}
+	return m0
+}
+
 // Keyless: only ever embedded, never written as a top-level item.
 type StoreRef struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
@@ -1751,7 +1897,7 @@ type StoreRef struct {
 
 func (x *StoreRef) Reset() {
 	*x = StoreRef{}
-	mi := &file_v1_example_proto_msgTypes[5]
+	mi := &file_v1_example_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1763,7 +1909,7 @@ func (x *StoreRef) String() string {
 func (*StoreRef) ProtoMessage() {}
 
 func (x *StoreRef) ProtoReflect() protoreflect.Message {
-	mi := &file_v1_example_proto_msgTypes[5]
+	mi := &file_v1_example_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1913,7 +2059,13 @@ const file_v1_example_proto_rawDesc = "" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\x12\x18\n" +
 	"\apayload\x18\x03 \x01(\tR\apayload:\x17\x82\xf7\x02\x13\x12\x0f\n" +
-	"\ttenant_id\x12\x02id\x18\x02\"\x1a\n" +
+	"\ttenant_id\x12\x02id\x18\x02\"j\n" +
+	"\n" +
+	"AuditEntry\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\x12\x16\n" +
+	"\x06action\x18\x03 \x01(\tR\x06action:\x17\x82\xf7\x02\x13\x12\x0f\n" +
+	"\ttenant_id\x12\x02id \x02\"\x1a\n" +
 	"\bStoreRef\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id*\"\n" +
 	"\tBasicEnum\x12\t\n" +
@@ -1922,7 +2074,7 @@ const file_v1_example_proto_rawDesc = "" +
 	"\x06Second\x10\x01B;Z1github.com/pquerna/protoc-gen-dynamo/examplepb/v1\x92\x03\x05\xd2>\x02\x10\x03b\beditionsp\xe8\a"
 
 var file_v1_example_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_v1_example_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_v1_example_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_v1_example_proto_goTypes = []any{
 	(BasicEnum)(0),                // 0: examplepb.v1.BasicEnum
 	(*Store)(nil),                 // 1: examplepb.v1.Store
@@ -1930,29 +2082,30 @@ var file_v1_example_proto_goTypes = []any{
 	(*StoreV2)(nil),               // 3: examplepb.v1.StoreV2
 	(*UserV2)(nil),                // 4: examplepb.v1.UserV2
 	(*BulkRecord)(nil),            // 5: examplepb.v1.BulkRecord
-	(*StoreRef)(nil),              // 6: examplepb.v1.StoreRef
-	(*timestamppb.Timestamp)(nil), // 7: google.protobuf.Timestamp
+	(*AuditEntry)(nil),            // 6: examplepb.v1.AuditEntry
+	(*StoreRef)(nil),              // 7: examplepb.v1.StoreRef
+	(*timestamppb.Timestamp)(nil), // 8: google.protobuf.Timestamp
 }
 var file_v1_example_proto_depIdxs = []int32{
-	7,  // 0: examplepb.v1.Store.opening_date:type_name -> google.protobuf.Timestamp
-	7,  // 1: examplepb.v1.Store.bin_date:type_name -> google.protobuf.Timestamp
-	7,  // 2: examplepb.v1.Store.updated_at:type_name -> google.protobuf.Timestamp
-	7,  // 3: examplepb.v1.Store.expires_at:type_name -> google.protobuf.Timestamp
-	7,  // 4: examplepb.v1.Store.expires_at_ms:type_name -> google.protobuf.Timestamp
-	7,  // 5: examplepb.v1.Store.expires_at_ns:type_name -> google.protobuf.Timestamp
-	7,  // 6: examplepb.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 7: examplepb.v1.User.updated_at:type_name -> google.protobuf.Timestamp
-	7,  // 8: examplepb.v1.User.deleted_at:type_name -> google.protobuf.Timestamp
+	8,  // 0: examplepb.v1.Store.opening_date:type_name -> google.protobuf.Timestamp
+	8,  // 1: examplepb.v1.Store.bin_date:type_name -> google.protobuf.Timestamp
+	8,  // 2: examplepb.v1.Store.updated_at:type_name -> google.protobuf.Timestamp
+	8,  // 3: examplepb.v1.Store.expires_at:type_name -> google.protobuf.Timestamp
+	8,  // 4: examplepb.v1.Store.expires_at_ms:type_name -> google.protobuf.Timestamp
+	8,  // 5: examplepb.v1.Store.expires_at_ns:type_name -> google.protobuf.Timestamp
+	8,  // 6: examplepb.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	8,  // 7: examplepb.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	8,  // 8: examplepb.v1.User.deleted_at:type_name -> google.protobuf.Timestamp
 	0,  // 9: examplepb.v1.User.an_enum:type_name -> examplepb.v1.BasicEnum
-	7,  // 10: examplepb.v1.StoreV2.opening_date:type_name -> google.protobuf.Timestamp
-	7,  // 11: examplepb.v1.StoreV2.bin_date:type_name -> google.protobuf.Timestamp
-	7,  // 12: examplepb.v1.StoreV2.updated_at:type_name -> google.protobuf.Timestamp
-	7,  // 13: examplepb.v1.StoreV2.expires_at:type_name -> google.protobuf.Timestamp
-	7,  // 14: examplepb.v1.StoreV2.expires_at_ms:type_name -> google.protobuf.Timestamp
-	7,  // 15: examplepb.v1.StoreV2.expires_at_ns:type_name -> google.protobuf.Timestamp
-	7,  // 16: examplepb.v1.UserV2.created_at:type_name -> google.protobuf.Timestamp
-	7,  // 17: examplepb.v1.UserV2.updated_at:type_name -> google.protobuf.Timestamp
-	7,  // 18: examplepb.v1.UserV2.deleted_at:type_name -> google.protobuf.Timestamp
+	8,  // 10: examplepb.v1.StoreV2.opening_date:type_name -> google.protobuf.Timestamp
+	8,  // 11: examplepb.v1.StoreV2.bin_date:type_name -> google.protobuf.Timestamp
+	8,  // 12: examplepb.v1.StoreV2.updated_at:type_name -> google.protobuf.Timestamp
+	8,  // 13: examplepb.v1.StoreV2.expires_at:type_name -> google.protobuf.Timestamp
+	8,  // 14: examplepb.v1.StoreV2.expires_at_ms:type_name -> google.protobuf.Timestamp
+	8,  // 15: examplepb.v1.StoreV2.expires_at_ns:type_name -> google.protobuf.Timestamp
+	8,  // 16: examplepb.v1.UserV2.created_at:type_name -> google.protobuf.Timestamp
+	8,  // 17: examplepb.v1.UserV2.updated_at:type_name -> google.protobuf.Timestamp
+	8,  // 18: examplepb.v1.UserV2.deleted_at:type_name -> google.protobuf.Timestamp
 	0,  // 19: examplepb.v1.UserV2.an_enum:type_name -> examplepb.v1.BasicEnum
 	20, // [20:20] is the sub-list for method output_type
 	20, // [20:20] is the sub-list for method input_type
@@ -1972,7 +2125,7 @@ func file_v1_example_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_v1_example_proto_rawDesc), len(file_v1_example_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

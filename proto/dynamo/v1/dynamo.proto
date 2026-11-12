@@ -18,10 +18,18 @@ message DynamoMessageOptions {
   // A compound value that can be used as a partition and sort key. Multiple
   // keys will be added as gsi keys after the first.
   repeated Key key = 2;
-  // Default write priority for changes to this type, stamped on every keyed
-  // item as the "wp" attribute. Callers may override it per write on the
-  // marshalled item (see pkg/dynamoattr).
-  WritePriority write_priority = 3;
+  // Write priority for changes to this type, stamped on every keyed item as
+  // the "wp" attribute. Only valid on keyed messages. If neither is set, the
+  // priority is NORMAL and may be overridden per write.
+  oneof priority {
+    // Default priority. A single write may override it with the generated
+    // MarshalDynamoItemWithPriority method.
+    WritePriority write_priority = 3;
+    // Fixed priority: every write of this type carries it, and no override
+    // method is generated, so a per-write change does not compile. Must not be
+    // WRITE_PRIORITY_UNSPECIFIED.
+    WritePriority pinned_write_priority = 4;
+  }
 }
 
 // The value stored in DynamoDB for an enum value annotated with it.

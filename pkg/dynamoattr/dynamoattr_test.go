@@ -71,23 +71,20 @@ func TestParseWritePriorityUnknown(t *testing.T) {
 	}
 }
 
-func TestSetGetWritePriority(t *testing.T) {
+func TestGetWritePriority(t *testing.T) {
 	item := map[string]types.AttributeValue{}
 	if _, ok := GetWritePriority(item); ok {
 		t.Fatal("GetWritePriority on empty item: want ok=false")
 	}
 
-	SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND)
+	item[WritePriorityAttr] = &types.AttributeValueMemberS{Value: "background"}
 	if p, ok := GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND {
-		t.Fatalf("after set BACKGROUND: got %s, %v", p, ok)
+		t.Fatalf("background: got %s, %v", p, ok)
 	}
 
-	SetWritePriority(item, dynamov1.WritePriority_WRITE_PRIORITY_NORMAL)
+	item[WritePriorityAttr] = &types.AttributeValueMemberS{Value: "normal"}
 	if p, ok := GetWritePriority(item); !ok || p != dynamov1.WritePriority_WRITE_PRIORITY_NORMAL {
-		t.Fatalf("after overwrite NORMAL: got %s, %v", p, ok)
-	}
-	if s := item[WritePriorityAttr].(*types.AttributeValueMemberS).Value; s != "normal" {
-		t.Fatalf("stored value = %q, want %q", s, "normal")
+		t.Fatalf("normal: got %s, %v", p, ok)
 	}
 
 	item[WritePriorityAttr] = &types.AttributeValueMemberN{Value: "1"}

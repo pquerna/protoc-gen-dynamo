@@ -8,31 +8,49 @@ import (
 	"github.com/pquerna/protoc-gen-dynamo/pkg/dynamoattr"
 )
 
+func defaultPriority(p dynamopb.WritePriority) *dynamopb.DynamoMessageOptions_WritePriority {
+	return &dynamopb.DynamoMessageOptions_WritePriority{WritePriority: p}
+}
+
+func pinnedPriority(p dynamopb.WritePriority) *dynamopb.DynamoMessageOptions_PinnedWritePriority {
+	return &dynamopb.DynamoMessageOptions_PinnedWritePriority{PinnedWritePriority: p}
+}
+
 func TestWritePriorityAttrValue(t *testing.T) {
 	cases := []struct {
-		name string
-		p    dynamopb.WritePriority
-		want string
+		name       string
+		mext       *dynamopb.DynamoMessageOptions
+		want       string
+		wantPinned bool
 	}{
-		{name: "unspecified resolves to normal", p: dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED, want: "normal"},
-		{name: "normal", p: dynamopb.WritePriority_WRITE_PRIORITY_NORMAL, want: "normal"},
-		{name: "background", p: dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND, want: "background"},
+		{name: "neither set resolves to normal", mext: &dynamopb.DynamoMessageOptions{}, want: "normal"},
+		{name: "unspecified resolves to normal", mext: &dynamopb.DynamoMessageOptions{Priority: defaultPriority(dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED)}, want: "normal"},
+		{name: "normal", mext: &dynamopb.DynamoMessageOptions{Priority: defaultPriority(dynamopb.WritePriority_WRITE_PRIORITY_NORMAL)}, want: "normal"},
+		{name: "background", mext: &dynamopb.DynamoMessageOptions{Priority: defaultPriority(dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND)}, want: "background"},
+		{name: "pinned normal", mext: &dynamopb.DynamoMessageOptions{Priority: pinnedPriority(dynamopb.WritePriority_WRITE_PRIORITY_NORMAL)}, want: "normal", wantPinned: true},
+		{name: "pinned background", mext: &dynamopb.DynamoMessageOptions{Priority: pinnedPriority(dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND)}, want: "background", wantPinned: true},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := writePriorityAttrValue(&dynamopb.DynamoMessageOptions{WritePriority: tc.p})
+			got, err := writePriorityAttrValue(tc.mext)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if got != tc.want {
 				t.Fatalf("got %q, want %q", got, tc.want)
 			}
+			if pinned := writePriorityPinned(tc.mext); pinned != tc.wantPinned {
+				t.Fatalf("pinned = %v, want %v", pinned, tc.wantPinned)
+			}
 		})
 	}
 
-	if _, err := writePriorityAttrValue(&dynamopb.DynamoMessageOptions{WritePriority: 999}); err == nil {
+	if _, err := writePriorityAttrValue(&dynamopb.DynamoMessageOptions{Priority: defaultPriority(999)}); err == nil {
 		t.Fatal("expected an error for an unknown write_priority")
+	}
+	if _, err := writePriorityAttrValue(&dynamopb.DynamoMessageOptions{Priority: pinnedPriority(999)}); err == nil {
+		t.Fatal("expected an error for an unknown pinned_write_priority")
 	}
 }
 
@@ -172,25 +190,35 @@ func TestValidateWritePriority(t *testing.T) {
 	cases := []struct {
 		name    string
 		mext    *dynamopb.DynamoMessageOptions
-		wantErr bool
+		wantErr string
 	}{
 		{name: "keyless, unset", mext: &dynamopb.DynamoMessageOptions{}},
 		{name: "keyed, unset", mext: &dynamopb.DynamoMessageOptions{Key: keyed}},
-		{name: "keyed, background", mext: &dynamopb.DynamoMessageOptions{Key: keyed, WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND}},
-		{name: "keyless, background", mext: &dynamopb.DynamoMessageOptions{WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND}, wantErr: true},
-		{name: "keyless, normal", mext: &dynamopb.DynamoMessageOptions{WritePriority: dynamopb.WritePriority_WRITE_PRIORITY_NORMAL}, wantErr: true},
+		{name: "keyed, background", mext: &dynamopb.DynamoMessageOptions{Key: keyed, Priority: defaultPriority(dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND)}},
+		{name: "keyless, background", mext: &dynamopb.DynamoMessageOptions{Priority: defaultPriority(dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND)}, wantErr: "write_priority is set"},
+		{name: "keyless, normal", mext: &dynamopb.DynamoMessageOptions{Priority: defaultPriority(dynamopb.WritePriority_WRITE_PRIORITY_NORMAL)}, wantErr: "write_priority is set"},
+		{name: "keyed, pinned background", mext: &dynamopb.DynamoMessageOptions{Key: keyed, Priority: pinnedPriority(dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND)}},
+		{name: "keyed, pinned normal", mext: &dynamopb.DynamoMessageOptions{Key: keyed, Priority: pinnedPriority(dynamopb.WritePriority_WRITE_PRIORITY_NORMAL)}},
+		{name: "keyed, pinned unspecified", mext: &dynamopb.DynamoMessageOptions{Key: keyed, Priority: pinnedPriority(dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED)}, wantErr: "pinned_write_priority is WRITE_PRIORITY_UNSPECIFIED"},
+		{name: "keyless, pinned background", mext: &dynamopb.DynamoMessageOptions{Priority: pinnedPriority(dynamopb.WritePriority_WRITE_PRIORITY_BACKGROUND)}, wantErr: "pinned_write_priority is set"},
+		{name: "keyless, pinned unspecified", mext: &dynamopb.DynamoMessageOptions{Priority: pinnedPriority(dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED)}, wantErr: "pinned_write_priority is set"},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			err := validateWritePriority(msgName, tc.mext)
 			switch {
-			case !tc.wantErr && err != nil:
+			case tc.wantErr == "" && err != nil:
 				t.Fatalf("expected no error, got %v", err)
-			case tc.wantErr && err == nil:
-				t.Fatal("expected an error, got nil")
-			case tc.wantErr && !strings.Contains(err.Error(), msgName):
-				t.Fatalf("error should name the message %q, got %v", msgName, err)
+			case tc.wantErr != "" && err == nil:
+				t.Fatalf("expected error containing %q, got nil", tc.wantErr)
+			case tc.wantErr != "":
+				if !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("expected error containing %q, got %v", tc.wantErr, err)
+				}
+				if !strings.Contains(err.Error(), msgName) {
+					t.Fatalf("error should name the message %q, got %v", msgName, err)
+				}
 			}
 		})
 	}

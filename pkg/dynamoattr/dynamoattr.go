@@ -51,12 +51,6 @@ func ParseWritePriority(s string) (dynamov1.WritePriority, bool) {
 	return p, ok
 }
 
-// SetWritePriority overwrites the attribute on a marshalled item, e.g. the
-// result of MarshalDynamoItem or a PutItemInput.Item.
-func SetWritePriority(item map[string]types.AttributeValue, p dynamov1.WritePriority) {
-	item[WritePriorityAttr] = &types.AttributeValueMemberS{Value: WritePriorityAttrValue(p)}
-}
-
 // GetWritePriority reads the attribute from a marshalled item. ok is false if
 // the attribute is missing (e.g. an item written before it existed), is not a
 // string, or holds an unrecognised value.

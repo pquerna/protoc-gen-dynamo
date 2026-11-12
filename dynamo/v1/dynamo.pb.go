@@ -83,10 +83,15 @@ type DynamoMessageOptions struct {
 	// A compound value that can be used as a partition and sort key. Multiple
 	// keys will be added as gsi keys after the first.
 	Key []*Key `protobuf:"bytes,2,rep,name=key,proto3" json:"key,omitempty"`
-	// Default write priority for changes to this type, stamped on every keyed
-	// item as the "wp" attribute. Callers may override it per write on the
-	// marshalled item (see pkg/dynamoattr).
-	WritePriority WritePriority `protobuf:"varint,3,opt,name=write_priority,json=writePriority,proto3,enum=dynamo.v1.WritePriority" json:"write_priority,omitempty"`
+	// Write priority for changes to this type, stamped on every keyed item as
+	// the "wp" attribute. Only valid on keyed messages. If neither is set, the
+	// priority is NORMAL and may be overridden per write.
+	//
+	// Types that are valid to be assigned to Priority:
+	//
+	//	*DynamoMessageOptions_WritePriority
+	//	*DynamoMessageOptions_PinnedWritePriority
+	Priority      isDynamoMessageOptions_Priority `protobuf_oneof:"priority"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -135,12 +140,51 @@ func (x *DynamoMessageOptions) GetKey() []*Key {
 	return nil
 }
 
+func (x *DynamoMessageOptions) GetPriority() isDynamoMessageOptions_Priority {
+	if x != nil {
+		return x.Priority
+	}
+	return nil
+}
+
 func (x *DynamoMessageOptions) GetWritePriority() WritePriority {
 	if x != nil {
-		return x.WritePriority
+		if x, ok := x.Priority.(*DynamoMessageOptions_WritePriority); ok {
+			return x.WritePriority
+		}
 	}
 	return WritePriority_WRITE_PRIORITY_UNSPECIFIED
 }
+
+func (x *DynamoMessageOptions) GetPinnedWritePriority() WritePriority {
+	if x != nil {
+		if x, ok := x.Priority.(*DynamoMessageOptions_PinnedWritePriority); ok {
+			return x.PinnedWritePriority
+		}
+	}
+	return WritePriority_WRITE_PRIORITY_UNSPECIFIED
+}
+
+type isDynamoMessageOptions_Priority interface {
+	isDynamoMessageOptions_Priority()
+}
+
+type DynamoMessageOptions_WritePriority struct {
+	// Default priority. A single write may override it with the generated
+	// MarshalDynamoItemWithPriority method.
+	WritePriority WritePriority `protobuf:"varint,3,opt,name=write_priority,json=writePriority,proto3,enum=dynamo.v1.WritePriority,oneof"`
+}
+
+type DynamoMessageOptions_PinnedWritePriority struct {
+	// Fixed priority: every write of this type carries it, and no override
+	// method is generated, so a per-write change does not compile. Must not be
+	// WRITE_PRIORITY_UNSPECIFIED.
+	PinnedWritePriority WritePriority `protobuf:"varint,4,opt,name=pinned_write_priority,json=pinnedWritePriority,proto3,enum=dynamo.v1.WritePriority,oneof"`
+}
+
+func (*DynamoMessageOptions_WritePriority) isDynamoMessageOptions_Priority() {}
+
+func (*DynamoMessageOptions_PinnedWritePriority) isDynamoMessageOptions_Priority() {}
 
 type Key struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
@@ -433,11 +477,14 @@ var File_dynamo_v1_dynamo_proto protoreflect.FileDescriptor
 
 const file_dynamo_v1_dynamo_proto_rawDesc = "" +
 	"\n" +
-	"\x16dynamo/v1/dynamo.proto\x12\tdynamo.v1\x1a google/protobuf/descriptor.proto\"\x95\x01\n" +
+	"\x16dynamo/v1/dynamo.proto\x12\tdynamo.v1\x1a google/protobuf/descriptor.proto\"\xf3\x01\n" +
 	"\x14DynamoMessageOptions\x12\x1a\n" +
 	"\bdisabled\x18\x01 \x01(\bR\bdisabled\x12 \n" +
-	"\x03key\x18\x02 \x03(\v2\x0e.dynamo.v1.KeyR\x03key\x12?\n" +
-	"\x0ewrite_priority\x18\x03 \x01(\x0e2\x18.dynamo.v1.WritePriorityR\rwritePriority\"\x89\x01\n" +
+	"\x03key\x18\x02 \x03(\v2\x0e.dynamo.v1.KeyR\x03key\x12A\n" +
+	"\x0ewrite_priority\x18\x03 \x01(\x0e2\x18.dynamo.v1.WritePriorityH\x00R\rwritePriority\x12N\n" +
+	"\x15pinned_write_priority\x18\x04 \x01(\x0e2\x18.dynamo.v1.WritePriorityH\x00R\x13pinnedWritePriorityB\n" +
+	"\n" +
+	"\bpriority\"\x89\x01\n" +
 	"\x03Key\x12\x1b\n" +
 	"\tpk_fields\x18\x01 \x03(\tR\bpkFields\x12\x1b\n" +
 	"\tsk_fields\x18\x02 \x03(\tR\bskFields\x12\x19\n" +
@@ -496,26 +543,31 @@ var file_dynamo_v1_dynamo_proto_goTypes = []any{
 	(*descriptorpb.FieldOptions)(nil),     // 8: google.protobuf.FieldOptions
 }
 var file_dynamo_v1_dynamo_proto_depIdxs = []int32{
-	2, // 0: dynamo.v1.DynamoMessageOptions.key:type_name -> dynamo.v1.Key
-	0, // 1: dynamo.v1.DynamoMessageOptions.write_priority:type_name -> dynamo.v1.WritePriority
-	3, // 2: dynamo.v1.Key.shard:type_name -> dynamo.v1.ShardOptions
-	5, // 3: dynamo.v1.DynamoFieldOptions.type:type_name -> dynamo.v1.Types
-	6, // 4: dynamo.v1.msg:extendee -> google.protobuf.MessageOptions
-	7, // 5: dynamo.v1.attr_value:extendee -> google.protobuf.EnumValueOptions
-	8, // 6: dynamo.v1.field:extendee -> google.protobuf.FieldOptions
-	1, // 7: dynamo.v1.msg:type_name -> dynamo.v1.DynamoMessageOptions
-	4, // 8: dynamo.v1.field:type_name -> dynamo.v1.DynamoFieldOptions
-	9, // [9:9] is the sub-list for method output_type
-	9, // [9:9] is the sub-list for method input_type
-	7, // [7:9] is the sub-list for extension type_name
-	4, // [4:7] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	2,  // 0: dynamo.v1.DynamoMessageOptions.key:type_name -> dynamo.v1.Key
+	0,  // 1: dynamo.v1.DynamoMessageOptions.write_priority:type_name -> dynamo.v1.WritePriority
+	0,  // 2: dynamo.v1.DynamoMessageOptions.pinned_write_priority:type_name -> dynamo.v1.WritePriority
+	3,  // 3: dynamo.v1.Key.shard:type_name -> dynamo.v1.ShardOptions
+	5,  // 4: dynamo.v1.DynamoFieldOptions.type:type_name -> dynamo.v1.Types
+	6,  // 5: dynamo.v1.msg:extendee -> google.protobuf.MessageOptions
+	7,  // 6: dynamo.v1.attr_value:extendee -> google.protobuf.EnumValueOptions
+	8,  // 7: dynamo.v1.field:extendee -> google.protobuf.FieldOptions
+	1,  // 8: dynamo.v1.msg:type_name -> dynamo.v1.DynamoMessageOptions
+	4,  // 9: dynamo.v1.field:type_name -> dynamo.v1.DynamoFieldOptions
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	8,  // [8:10] is the sub-list for extension type_name
+	5,  // [5:8] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_dynamo_v1_dynamo_proto_init() }
 func file_dynamo_v1_dynamo_proto_init() {
 	if File_dynamo_v1_dynamo_proto != nil {
 		return
+	}
+	file_dynamo_v1_dynamo_proto_msgTypes[0].OneofWrappers = []any{
+		(*DynamoMessageOptions_WritePriority)(nil),
+		(*DynamoMessageOptions_PinnedWritePriority)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{

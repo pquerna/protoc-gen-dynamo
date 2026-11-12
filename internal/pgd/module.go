@@ -82,25 +82,50 @@ const (
 	timestampType = "google.protobuf.Timestamp"
 )
 
-// writePriorityAttrValue returns the stored string for the message's default
-// write priority. UNSPECIFIED resolves to NORMAL. The string comes from the
-// (dynamo.v1.attr_value) option on the compiled-in enum, so stored values ship
-// with the plugin version.
+// writePriorityPinned reports whether the message sets pinned_write_priority.
+func writePriorityPinned(mext *dynamopb.DynamoMessageOptions) bool {
+	_, ok := mext.GetPriority().(*dynamopb.DynamoMessageOptions_PinnedWritePriority)
+	return ok
+}
+
+// effectiveWritePriority returns the message's write priority from whichever
+// member of the priority oneof is set, with UNSPECIFIED (including neither
+// set) resolved to NORMAL.
+func effectiveWritePriority(mext *dynamopb.DynamoMessageOptions) dynamopb.WritePriority {
+	if writePriorityPinned(mext) {
+		return mext.GetPinnedWritePriority().Resolved()
+	}
+	return mext.GetWritePriority().Resolved()
+}
+
+// writePriorityAttrValue returns the stored string for the message's effective
+// write priority. The string comes from the (dynamo.v1.attr_value) option on
+// the compiled-in enum, so stored values ship with the plugin version.
 func writePriorityAttrValue(mext *dynamopb.DynamoMessageOptions) (string, error) {
-	p := mext.GetWritePriority()
+	p := effectiveWritePriority(mext)
 	s, ok := p.AttrValue()
 	if !ok {
-		return "", fmt.Errorf("write_priority %s has no (dynamo.v1.attr_value)", p)
+		return "", fmt.Errorf("write priority %s has no (dynamo.v1.attr_value)", p)
 	}
 	return s, nil
 }
 
-// validateWritePriority rejects write_priority on a keyless message. Keyless
+// validateWritePriority rejects write_priority or pinned_write_priority on a
+// keyless message, and a pinned_write_priority of UNSPECIFIED. Keyless
 // messages are only ever embedded, never written as items, so there is nothing
 // to stamp and the option would otherwise be silently ignored.
 func validateWritePriority(msgName string, mext *dynamopb.DynamoMessageOptions) error {
-	if len(mext.GetKey()) == 0 && mext.GetWritePriority() != dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED {
-		return fmt.Errorf("write_priority is set on message %s, which has no key: only keyed messages are written as items, and an embedded message does not pass its priority to its parent", msgName)
+	pinned := writePriorityPinned(mext)
+	if len(mext.GetKey()) == 0 {
+		if mext.GetWritePriority() != dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED {
+			return fmt.Errorf("write_priority is set on message %s, which has no key: only keyed messages are written as items, and an embedded message does not pass its priority to its parent", msgName)
+		}
+		if pinned {
+			return fmt.Errorf("pinned_write_priority is set on message %s, which has no key: only keyed messages are written as items, and an embedded message does not pass its priority to its parent", msgName)
+		}
+	}
+	if pinned && mext.GetPinnedWritePriority() == dynamopb.WritePriority_WRITE_PRIORITY_UNSPECIFIED {
+		return fmt.Errorf("pinned_write_priority is WRITE_PRIORITY_UNSPECIFIED on message %s: a pinned priority must name a value", msgName)
 	}
 	return nil
 }
@@ -849,10 +874,11 @@ func (m *Module) applyUtilityFuncs(f *jen.File, in pgs.File) error {
 			).Line()
 		}
 
-		// Default write priority for changes to this type. Keyless messages are
-		// never top-level items, so they carry no priority.
+		// Write priority for changes to this type. Keyless messages are never
+		// top-level items, so they carry no priority.
 		if len(mext.Key) > 0 {
-			wp := jen.Qual(dynamoV1Pkg, "WritePriority_"+mext.GetWritePriority().Resolved().String())
+			pinned := writePriorityPinned(&mext)
+			wp := jen.Qual(dynamoV1Pkg, "WritePriority_"+effectiveWritePriority(&mext).String())
 
 			f.Func().Id(structName.String()+"DefaultWritePriority").Params().Qual(dynamoV1Pkg, "WritePriority").Block(
 				jen.Return(wp.Clone()),
@@ -863,6 +889,39 @@ func (m *Module) applyUtilityFuncs(f *jen.File, in pgs.File) error {
 			).Id("DynamoDefaultWritePriority").Params().Qual(dynamoV1Pkg, "WritePriority").Block(
 				jen.Return(wp.Clone()),
 			).Line()
+
+			f.Func().Params(
+				jen.Id("p").Op("*").Id(structName.String()),
+			).Id("DynamoWritePriorityPinned").Params().Bool().Block(
+				jen.Return(jen.Lit(pinned)),
+			).Line()
+
+			// Per-write override, only for unpinned types: its absence on a
+			// pinned type is what keeps callers from overriding the priority.
+			if !pinned {
+				normal, ok := dynamopb.WritePriority_WRITE_PRIORITY_NORMAL.AttrValue()
+				if !ok {
+					return fmt.Errorf("WRITE_PRIORITY_NORMAL has no (dynamo.v1.attr_value)")
+				}
+				f.Func().Params(
+					jen.Id("p").Op("*").Id(structName.String()),
+				).Id("MarshalDynamoItemWithPriority").Params(
+					jen.Id("priority").Qual(dynamoV1Pkg, "WritePriority"),
+				).Params(jen.Map(jen.String()).Qual(dynamoV2Pkg, "AttributeValue"), jen.Error()).Block(
+					jen.List(jen.Id("item"), jen.Id("err")).Op(":=").Id("p").Dot("MarshalDynamoItem").Call(),
+					jen.If(jen.Id("err").Op("!=").Nil()).Block(
+						jen.Return(jen.Nil(), jen.Id("err")),
+					),
+					jen.List(jen.Id("wp"), jen.Id("ok")).Op(":=").Id("priority").Dot("AttrValue").Call(),
+					jen.If(jen.Op("!").Id("ok")).Block(
+						jen.Id("wp").Op("=").Lit(normal),
+					),
+					jen.Id("item").Index(jen.Lit(writePriorityField)).Op("=").Op("&").Qual(dynamoV2Pkg, "AttributeValueMemberS").Values(jen.Dict{
+						jen.Id("Value"): jen.Id("wp"),
+					}),
+					jen.Return(jen.Id("item"), jen.Nil()),
+				).Line()
+			}
 		}
 	}
 

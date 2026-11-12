@@ -178,6 +178,19 @@ message BulkRecord {
   string payload = 3;
 }
 
+// Audit entries: always processed in the background lane. The priority is
+// pinned, so no per-write override is generated.
+message AuditEntry {
+  option (dynamo.v1.msg).key = {
+    pk_fields: ["tenant_id"]
+    sk_fields: ["id"]
+  };
+  option (dynamo.v1.msg).pinned_write_priority = WRITE_PRIORITY_BACKGROUND;
+  string tenant_id = 1;
+  string id = 2;
+  string action = 3;
+}
+
 // Keyless: only ever embedded, never written as a top-level item.
 message StoreRef {
   string id = 1;

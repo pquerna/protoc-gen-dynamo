@@ -386,6 +386,49 @@ func (p *BulkRecord) MarshalDynamoDBAttributeValue() (types.AttributeValue, erro
 	return av, nil
 }
 
+func (p *AuditEntry) MarshalDynamo() (types.AttributeValue, error) {
+	return p.MarshalDynamoDBAttributeValue()
+}
+
+func (p *AuditEntry) MarshalDynamoItem() (map[string]types.AttributeValue, error) {
+	av, err := p.MarshalDynamoDBAttributeValue()
+	if err != nil {
+		return nil, err
+	}
+	avm, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return nil, fmt.Errorf("unable to marshal: expected type *types.AttributeValueMemberM, got %T", av)
+	}
+	return avm.Value, nil
+}
+
+func (p *AuditEntry) MarshalDynamoDBAttributeValue() (types.AttributeValue, error) {
+	var sb strings.Builder
+	var err error
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_audit_entry:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	v1 := &types.AttributeValueMemberS{Value: sb.String()}
+	sb.Reset()
+	_, _ = sb.WriteString(p.GetId())
+	v2 := &types.AttributeValueMemberS{Value: sb.String()}
+	v3buf, err := protozstd.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
+	v3 := &types.AttributeValueMemberB{Value: v3buf}
+	v4 := &types.AttributeValueMemberS{Value: "examplepb.v1.AuditEntry"}
+	var av types.AttributeValue
+	av = &types.AttributeValueMemberM{Value: map[string]types.AttributeValue{
+		"pk":    v1,
+		"sk":    v2,
+		"typ":   v4,
+		"value": v3,
+		"wp":    &types.AttributeValueMemberS{Value: "background"},
+	}}
+	return av, nil
+}
+
 func (p *StoreRef) MarshalDynamo() (types.AttributeValue, error) {
 	return p.MarshalDynamoDBAttributeValue()
 }
@@ -600,6 +643,43 @@ func (p *BulkRecord) UnmarshalDynamo(av types.AttributeValue) error {
 }
 
 func (p *BulkRecord) UnmarshalDynamoItem(av map[string]types.AttributeValue) error {
+	return p.UnmarshalDynamoDBAttributeValue(&types.AttributeValueMemberM{Value: av})
+}
+
+func (p *AuditEntry) UnmarshalDynamoDBAttributeValue(av types.AttributeValue) error {
+	m, ok := av.(*types.AttributeValueMemberM)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberM, got %T", av)
+	}
+	typ, ok := m.Value["typ"]
+	if !ok {
+		return fmt.Errorf("dynamo: typ missing")
+	}
+	t, ok := typ.(*types.AttributeValueMemberS)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberS, got %T", typ)
+	}
+	if t.Value != "examplepb.v1.AuditEntry" {
+		return fmt.Errorf("dynamo: _type mismatch: examplepb.v1.AuditEntry expected, got: '%s'", typ)
+	}
+	value, ok := m.Value["value"]
+	if !ok {
+		return fmt.Errorf("dynamo: value missing")
+	}
+	v, ok := value.(*types.AttributeValueMemberB)
+	if !ok {
+		return fmt.Errorf("unable to unmarshal: expected type *types.AttributeValueMemberB, got %T", value)
+	}
+	var data []byte
+	data = v.Value
+	return protozstd.Unmarshal(data, p)
+}
+
+func (p *AuditEntry) UnmarshalDynamo(av types.AttributeValue) error {
+	return p.UnmarshalDynamoDBAttributeValue(av)
+}
+
+func (p *AuditEntry) UnmarshalDynamoItem(av map[string]types.AttributeValue) error {
 	return p.UnmarshalDynamoDBAttributeValue(&types.AttributeValueMemberM{Value: av})
 }
 
@@ -1094,6 +1174,26 @@ func BulkRecordSortKey(id *string) string {
 	return (&BulkRecord_builder{Id: id}).Build().SortKey()
 }
 
+func (p *AuditEntry) PartitionKey() string {
+	var sb strings.Builder
+	sb.Reset()
+	_, _ = sb.WriteString("examplepb_v1_audit_entry:")
+	_, _ = sb.WriteString(p.GetTenantId())
+	return sb.String()
+}
+
+func AuditEntryPartitionKey(tenantId *string) string {
+	return (&AuditEntry_builder{TenantId: tenantId}).Build().PartitionKey()
+}
+
+func (p *AuditEntry) SortKey() string {
+	return p.GetId()
+}
+
+func AuditEntrySortKey(id *string) string {
+	return (&AuditEntry_builder{Id: id}).Build().SortKey()
+}
+
 func (_ *Store) Unsharded() {}
 
 func StoreDefaultWritePriority() dynamov1.WritePriority {
@@ -1102,6 +1202,23 @@ func StoreDefaultWritePriority() dynamov1.WritePriority {
 
 func (p *Store) DynamoDefaultWritePriority() dynamov1.WritePriority {
 	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
+}
+
+func (p *Store) DynamoWritePriorityPinned() bool {
+	return false
+}
+
+func (p *Store) MarshalDynamoItemWithPriority(priority dynamov1.WritePriority) (map[string]types.AttributeValue, error) {
+	item, err := p.MarshalDynamoItem()
+	if err != nil {
+		return nil, err
+	}
+	wp, ok := priority.AttrValue()
+	if !ok {
+		wp = "normal"
+	}
+	item["wp"] = &types.AttributeValueMemberS{Value: wp}
+	return item, nil
 }
 
 func (p *User) GetShardFromPartitionKey() (uint32, error) {
@@ -1134,6 +1251,23 @@ func (p *User) DynamoDefaultWritePriority() dynamov1.WritePriority {
 	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
+func (p *User) DynamoWritePriorityPinned() bool {
+	return false
+}
+
+func (p *User) MarshalDynamoItemWithPriority(priority dynamov1.WritePriority) (map[string]types.AttributeValue, error) {
+	item, err := p.MarshalDynamoItem()
+	if err != nil {
+		return nil, err
+	}
+	wp, ok := priority.AttrValue()
+	if !ok {
+		wp = "normal"
+	}
+	item["wp"] = &types.AttributeValueMemberS{Value: wp}
+	return item, nil
+}
+
 func (_ *StoreV2) Unsharded() {}
 
 func StoreV2DefaultWritePriority() dynamov1.WritePriority {
@@ -1142,6 +1276,23 @@ func StoreV2DefaultWritePriority() dynamov1.WritePriority {
 
 func (p *StoreV2) DynamoDefaultWritePriority() dynamov1.WritePriority {
 	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
+}
+
+func (p *StoreV2) DynamoWritePriorityPinned() bool {
+	return false
+}
+
+func (p *StoreV2) MarshalDynamoItemWithPriority(priority dynamov1.WritePriority) (map[string]types.AttributeValue, error) {
+	item, err := p.MarshalDynamoItem()
+	if err != nil {
+		return nil, err
+	}
+	wp, ok := priority.AttrValue()
+	if !ok {
+		wp = "normal"
+	}
+	item["wp"] = &types.AttributeValueMemberS{Value: wp}
+	return item, nil
 }
 
 func (_ *UserV2) Unsharded() {}
@@ -1198,6 +1349,23 @@ func (p *UserV2) DynamoDefaultWritePriority() dynamov1.WritePriority {
 	return dynamov1.WritePriority_WRITE_PRIORITY_NORMAL
 }
 
+func (p *UserV2) DynamoWritePriorityPinned() bool {
+	return false
+}
+
+func (p *UserV2) MarshalDynamoItemWithPriority(priority dynamov1.WritePriority) (map[string]types.AttributeValue, error) {
+	item, err := p.MarshalDynamoItem()
+	if err != nil {
+		return nil, err
+	}
+	wp, ok := priority.AttrValue()
+	if !ok {
+		wp = "normal"
+	}
+	item["wp"] = &types.AttributeValueMemberS{Value: wp}
+	return item, nil
+}
+
 func (_ *BulkRecord) Unsharded() {}
 
 func BulkRecordDefaultWritePriority() dynamov1.WritePriority {
@@ -1206,4 +1374,35 @@ func BulkRecordDefaultWritePriority() dynamov1.WritePriority {
 
 func (p *BulkRecord) DynamoDefaultWritePriority() dynamov1.WritePriority {
 	return dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND
+}
+
+func (p *BulkRecord) DynamoWritePriorityPinned() bool {
+	return false
+}
+
+func (p *BulkRecord) MarshalDynamoItemWithPriority(priority dynamov1.WritePriority) (map[string]types.AttributeValue, error) {
+	item, err := p.MarshalDynamoItem()
+	if err != nil {
+		return nil, err
+	}
+	wp, ok := priority.AttrValue()
+	if !ok {
+		wp = "normal"
+	}
+	item["wp"] = &types.AttributeValueMemberS{Value: wp}
+	return item, nil
+}
+
+func (_ *AuditEntry) Unsharded() {}
+
+func AuditEntryDefaultWritePriority() dynamov1.WritePriority {
+	return dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND
+}
+
+func (p *AuditEntry) DynamoDefaultWritePriority() dynamov1.WritePriority {
+	return dynamov1.WritePriority_WRITE_PRIORITY_BACKGROUND
+}
+
+func (p *AuditEntry) DynamoWritePriorityPinned() bool {
+	return true
 }
